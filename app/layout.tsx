@@ -10,8 +10,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: '资源平台 2.0 · 有我知了教学评一体化AI空间',
+  description: '任务导向的资源工作台与 AI 标签录题，让基础教育资源真正被用起来',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -46,7 +46,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html
+      lang="zh-CN"
+      className={`light ${geistSans.variable} ${geistMono.variable} bg-background`}
+    >
       <body className="font-sans antialiased">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
