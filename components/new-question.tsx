@@ -427,29 +427,20 @@ export function NewQuestion() {
           {/* 右侧：标签体系 */}
           <aside className="flex w-full shrink-0 flex-col gap-4 lg:w-[22rem]">
             <section className="rounded-xl border border-border bg-card">
-              <div className="border-b border-border p-4">
-                <div className="mb-1 flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+                <div className="flex items-center gap-2">
                   <h2 className="text-base font-bold text-foreground">标签体系</h2>
                   <span className="text-xs text-muted-foreground">
                     已选 <span className="font-semibold text-foreground">{selectedTags.size}</span>
                   </span>
                 </div>
-                <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
-                  从受控词表中选择各维度标签，或让 AI 依据题干自动打标，老师确认即可。
-                </p>
                 <button
                   onClick={runAi}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-brand px-2.5 py-1.5 text-xs font-medium text-brand-foreground transition hover:opacity-90"
                 >
-                  <Sparkles className="size-4" />
-                  {generated ? "重新生成标签" : "AI 一键生成标签"}
+                  <Sparkles className="size-3.5" />
+                  {generated ? "重新生成" : "AI 生成标签"}
                 </button>
-                {generated && (
-                  <p className="mt-2 flex items-center gap-1 text-xs text-brand">
-                    <Check className="size-3.5" />
-                    AI 已根据题干推荐标签，带 ✨ 为建议项，可增删
-                  </p>
-                )}
               </div>
 
               {/* 分类标签 */}
@@ -548,40 +539,13 @@ export function NewQuestion() {
               </div>
             </section>
 
-            {/* 保存到 */}
-            <section className="rounded-xl border border-border bg-card p-5">
-              <div className="mb-3 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  保存到：
-                  <span className="font-medium text-foreground">我的资源 / 校本资源</span>
-                </span>
-                <button className="text-xs font-medium text-brand hover:opacity-80">修改</button>
-              </div>
-              <p className="mb-2 text-sm font-medium text-foreground">保存后可用于</p>
-              <div className="flex flex-wrap gap-1.5">
-                {["加入题篮", "组卷", "布置作业", "课堂讲评"].map((u) => (
-                  <span
-                    key={u}
-                    className="rounded-md bg-muted px-2.5 py-1 text-[12px] text-muted-foreground"
-                  >
-                    {u}
-                  </span>
-                ))}
-              </div>
-            </section>
-
             {/* 操作按钮 */}
-            <div className="flex items-center gap-2">
-              <button className="flex-1 rounded-lg border border-border bg-card py-2.5 text-sm font-medium text-foreground transition hover:bg-muted">
-                保存草稿
-              </button>
-              <Link
-                href="/"
-                className="flex-1 rounded-lg bg-brand py-2.5 text-center text-sm font-medium text-brand-foreground transition hover:opacity-90"
-              >
-                保存题目
-              </Link>
-            </div>
+            <Link
+              href="/"
+              className="block rounded-lg bg-brand py-2.5 text-center text-sm font-medium text-brand-foreground transition hover:opacity-90"
+            >
+              保存题目
+            </Link>
           </aside>
         </div>
       )}

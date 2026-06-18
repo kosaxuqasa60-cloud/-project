@@ -7,22 +7,21 @@ import {
   Plus,
   ChevronDown,
   ShoppingCart,
-  Check,
   Rows3,
   StretchHorizontal,
   PlayCircle,
   FileText,
-  Sparkles,
   PanelLeftClose,
   PanelLeft,
   X,
   Trash2,
-  FilePlus2,
   Crown,
   Lock,
   Layers,
   ClipboardList,
   Clapperboard,
+  Eye,
+  ChevronLeft,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ChapterSidebar } from "@/components/chapter-sidebar"
@@ -271,6 +270,9 @@ type ResItem = {
   tags: string[]
   action: string
   hasVideo?: boolean
+  /* 试卷/资源包内题目（预览二级页用） */
+  qIds?: string[]
+  videoCount?: number
 }
 
 const homeworkData: ResItem[] = [
@@ -278,26 +280,29 @@ const homeworkData: ResItem[] = [
     id: "hw1",
     title: "第15章 一元一次不等式 · 单元复习作业",
     level: "区",
-    meta: ["20 题", "难度 基础-提升", "已布置 6 个班", "使用 218 次"],
+    meta: ["5 题", "难度 基础-提升", "已布置 6 个班", "使用 218 次"],
     tags: ["单元复习", "分层练习", "点阵笔适配"],
     action: "布置作业",
+    qIds: ["q1", "q2", "q3", "q4", "q5"],
   },
   {
     id: "hw2",
     title: "15.2 不等式组解集 · 课后巩固",
     level: "校",
-    meta: ["12 题", "难度 基础", "已布置 3 个班", "使用 91 次"],
+    meta: ["3 题", "难度 基础", "已布置 3 个班", "使用 91 次"],
     tags: ["课后巩固", "易错训练"],
     action: "布置作业",
+    qIds: ["q2", "q3", "q1"],
   },
   {
     id: "hw3",
     title: "一元一次不等式 · 培优拔高卷",
     level: "市",
-    meta: ["15 题", "难度 提升-挑战", "使用 326 次"],
+    meta: ["4 题", "难度 提升-挑战", "使用 326 次"],
     tags: ["培优", "压轴", "含视频讲解"],
     action: "布置作业",
     hasVideo: true,
+    qIds: ["q4", "q5", "q2", "q1"],
   },
 ]
 
@@ -363,28 +368,34 @@ const premiumData: ResItem[] = [
     id: "pm1",
     title: "一元一次不等式组专项训练（精品讲解包）",
     level: "市",
-    meta: ["含 12 题", "12 个视频讲解", "预计 18 分钟"],
+    meta: ["含 5 题", "5 个视频讲解", "预计 18 分钟"],
     tags: ["精品讲解", "课后巩固", "错题讲评"],
-    action: "加入题篮",
+    action: "布置作业",
     hasVideo: true,
+    qIds: ["q1", "q2", "q4", "q5", "q3"],
+    videoCount: 5,
   },
   {
     id: "pm2",
     title: "中考一轮 · 不等式与不等式组高频考点",
     level: "市",
-    meta: ["含 30 题", "8 个微课", "配套测评卷"],
+    meta: ["含 4 题", "4 个微课", "配套测评卷"],
     tags: ["中考复习", "高频考点", "名师讲解"],
-    action: "加入题篮",
+    action: "布置作业",
     hasVideo: true,
+    qIds: ["q4", "q1", "q5", "q2"],
+    videoCount: 4,
   },
   {
     id: "pm3",
     title: "分层走班 · 不等式拓展提升资源库",
     level: "区",
-    meta: ["含 45 题", "15 个视频", "三档分层"],
+    meta: ["含 3 题", "3 个视频", "三档分层"],
     tags: ["分层教学", "走班", "拓展提升"],
-    action: "加入题篮",
+    action: "布置作业",
     hasVideo: true,
+    qIds: ["q5", "q4", "q2"],
+    videoCount: 3,
   },
 ]
 
@@ -507,16 +518,16 @@ function QuestionCard({
               className={cn(
                 "inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition",
                 selected
-                  ? "bg-brand text-brand-foreground hover:opacity-90"
-                  : "bg-brand-soft text-brand-soft-foreground hover:bg-brand hover:text-brand-foreground",
+                  ? "border border-border bg-card text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+                  : "bg-brand text-brand-foreground hover:opacity-90",
               )}
             >
               {selected ? (
-                <Check className="size-3.5" strokeWidth={3} />
+                <X className="size-3.5" strokeWidth={2.5} />
               ) : (
                 <ShoppingCart className="size-3.5" />
               )}
-              {selected ? "已加入" : "加入"}
+              {selected ? "移出" : "加入"}
             </button>
           </div>
         </div>
@@ -616,7 +627,17 @@ function TagDimension({
 
 /* ---------------------------- 其他资源卡 ---------------------------- */
 
-function ResourceCard({ item, premium }: { item: ResItem; premium?: boolean }) {
+function ResourceCard({
+  item,
+  premium,
+  canPreview,
+  onPreview,
+}: {
+  item: ResItem
+  premium?: boolean
+  canPreview?: boolean
+  onPreview?: () => void
+}) {
   return (
     <article className="rounded-xl border border-border bg-card p-4 transition hover:border-brand/40 hover:shadow-sm sm:p-5">
       <div className="flex items-start gap-3">
@@ -655,16 +676,154 @@ function ResourceCard({ item, premium }: { item: ResItem; premium?: boolean }) {
           </span>
         ))}
         <div className="ml-auto flex items-center gap-2">
-          <button className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-brand/40 hover:text-foreground">
-            预览
+          <button
+            onClick={onPreview}
+            disabled={!canPreview}
+            className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-brand/40 hover:text-foreground disabled:opacity-50"
+          >
+            <Eye className="size-3.5" />
+            {premium ? "查看试卷" : "预览"}
           </button>
-          <button className="inline-flex items-center gap-1 rounded-lg bg-brand-soft px-3 py-1.5 text-xs font-medium text-brand-soft-foreground transition hover:bg-brand hover:text-brand-foreground">
-            <Plus className="size-3.5" />
+          <button className="inline-flex items-center gap-1 rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition hover:opacity-90">
+            <ClipboardList className="size-3.5" />
             {item.action}
           </button>
         </div>
       </div>
     </article>
+  )
+}
+
+/* ---------------------------- 试卷预览二级页 ---------------------------- */
+
+function PaperDetail({
+  paper,
+  premium,
+  onBack,
+}: {
+  paper: ResItem
+  premium?: boolean
+  onBack: () => void
+}) {
+  const papered = (paper.qIds ?? []).map((id) => questions.find((q) => q.id === id)!).filter(Boolean)
+
+  /* 按题型分大题 */
+  const typeOrder: QType[] = ["单选", "多选", "填空", "判断", "主观"]
+  const typeLabel: Record<QType, string> = {
+    单选: "一、单项选择题",
+    多选: "二、多项选择题",
+    填空: "三、填空题",
+    判断: "四、判断题",
+    主观: "五、主观题",
+  }
+  const grouped = typeOrder
+    .map((t) => ({ type: t, items: papered.filter((q) => q.qType === t) }))
+    .filter((g) => g.items.length)
+
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* 二级页头部 */}
+      <div className="sticky top-0 z-10 border-b border-border bg-background/85 px-5 py-3 backdrop-blur">
+        <button
+          onClick={onBack}
+          className="mb-2 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+        >
+          <ChevronLeft className="size-4" />
+          返回资源列表
+        </button>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              {premium && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-[oklch(0.72_0.13_70)] px-1.5 py-0.5 text-[11px] font-bold text-white">
+                  <Crown className="size-3" />
+                  精品
+                </span>
+              )}
+              <h1 className="truncate text-lg font-bold text-foreground">{paper.title}</h1>
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <SourceBadge level={paper.level} showLabel />
+              {paper.meta.map((m) => (
+                <span key={m}>{m}</span>
+              ))}
+            </div>
+          </div>
+          <button className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90">
+            <ClipboardList className="size-4" />
+            布置作业
+          </button>
+        </div>
+      </div>
+
+      {/* 题目列表（含每题讲解视频） */}
+      <div className="mx-auto max-w-4xl px-5 py-5">
+        {premium && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg bg-[oklch(0.97_0.03_75)] px-3 py-2 text-xs text-[oklch(0.45_0.09_60)]">
+            <Crown className="size-3.5" />
+            本精品试卷共 {papered.length} 题，含 {paper.videoCount ?? papered.length} 个名师讲解视频，已开通学校可直接布置或查看讲解。
+          </div>
+        )}
+        <div className="flex flex-col gap-5">
+          {grouped.map((g) => (
+            <section key={g.type}>
+              <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-foreground">
+                {typeLabel[g.type]}
+                <span className="rounded-full bg-brand-soft px-1.5 text-[11px] font-medium text-brand-soft-foreground">
+                  {g.items.length} 题
+                </span>
+              </h2>
+              <div className="flex flex-col gap-3">
+                {g.items.map((q, i) => (
+                  <article key={q.id} className="rounded-xl border border-border bg-card p-4 sm:p-5">
+                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-semibold text-muted-foreground">{i + 1}</span>
+                      <SourceBadge level={q.level} />
+                      <span className={cn("rounded px-1.5 py-0.5 font-medium", diffStyle[q.difficulty])}>
+                        {q.difficulty}
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 rounded bg-warn/20 px-1.5 py-0.5 font-medium text-warn-foreground">
+                        <PlayCircle className="size-3" />
+                        视频讲解
+                      </span>
+                    </div>
+                    <div className="text-[15px] leading-7 text-foreground">{q.stem}</div>
+                    {q.options && (
+                      <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                        {q.options.map((o) => (
+                          <div key={o.key} className="flex items-baseline gap-2 text-sm text-foreground">
+                            <span className="font-medium text-muted-foreground">{o.key}.</span>
+                            <span>{o.content}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="my-3 border-t border-dashed border-border" />
+                    <div className="flex items-start gap-2 text-sm leading-7">
+                      <span className="shrink-0 font-medium text-brand">【答案】</span>
+                      <div>{q.answer}</div>
+                    </div>
+                    {/* 讲解视频 */}
+                    <div className="mt-3 flex items-center gap-3 rounded-lg bg-muted/60 p-2.5">
+                      <div className="grid size-9 shrink-0 place-items-center rounded-md bg-brand text-brand-foreground">
+                        <PlayCircle className="size-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13px] font-medium text-foreground">{q.videoTitle}</p>
+                        <p className="text-xs text-muted-foreground">讲解视频 · {q.videoDuration}</p>
+                      </div>
+                      <button className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-brand transition hover:bg-brand-soft">
+                        播放
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -681,6 +840,7 @@ export function ResourceWorkbench() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [cartOpen, setCartOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [previewPaper, setPreviewPaper] = useState<ResItem | null>(null)
 
   const toggle = (id: string) =>
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
@@ -723,6 +883,14 @@ export function ResourceWorkbench() {
 
       {/* 主区域 */}
       <div className="flex min-w-0 flex-1 flex-col">
+        {previewPaper ? (
+          <PaperDetail
+            paper={previewPaper}
+            premium={isPremium}
+            onBack={() => setPreviewPaper(null)}
+          />
+        ) : (
+          <>
         {/* 工具栏（无面包屑） */}
         <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-border bg-background/85 px-5 py-3 backdrop-blur">
           <button
@@ -738,7 +906,10 @@ export function ResourceWorkbench() {
             {resourceTypes.map((t) => (
               <button
                 key={t.key}
-                onClick={() => setResourceType(t.key)}
+                onClick={() => {
+                  setResourceType(t.key)
+                  setPreviewPaper(null)
+                }}
                 className={cn(
                   "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition",
                   resourceType === t.key
@@ -879,11 +1050,19 @@ export function ResourceWorkbench() {
           ) : (
             <div className="flex flex-col gap-3">
               {otherData.map((item) => (
-                <ResourceCard key={item.id} item={item} premium={isPremium} />
+                <ResourceCard
+                  key={item.id}
+                  item={item}
+                  premium={isPremium}
+                  canPreview={resourceType === "作业" || isPremium}
+                  onPreview={() => setPreviewPaper(item)}
+                />
               ))}
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
 
       {/* 右侧悬浮题篮球 */}
@@ -968,11 +1147,20 @@ function CartDrawer({
 }) {
   if (!open) return null
 
-  /* 按大题归类 */
+  /* 按题型归类（大题），题为小题 */
+  const typeOrder: QType[] = ["单选", "多选", "填空", "判断", "主观"]
+  const typeLabel: Record<QType, string> = {
+    单选: "一、单项选择题",
+    多选: "二、多项选择题",
+    填空: "三、填空题",
+    判断: "四、判断题",
+    主观: "五、主观题",
+  }
   const groups = items.reduce<Record<string, Question[]>>((acc, q) => {
-    ;(acc[q.group] ||= []).push(q)
+    ;(acc[q.qType] ||= []).push(q)
     return acc
   }, {})
+  const orderedGroups = typeOrder.filter((t) => groups[t]?.length)
 
   return (
     <div className="fixed inset-0 z-50">
@@ -1002,30 +1190,27 @@ function CartDrawer({
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {Object.entries(groups).map(([group, qs]) => (
-                <div key={group}>
-                  {/* 大题分组标题 */}
+              {orderedGroups.map((t) => (
+                <div key={t}>
+                  {/* 大题（题型）分组标题 */}
                   <div className="mb-1.5 flex items-center gap-2">
-                    <span className="text-[13px] font-semibold text-foreground">{group}</span>
+                    <span className="text-[13px] font-semibold text-foreground">{typeLabel[t]}</span>
                     <span className="rounded-full bg-brand-soft px-1.5 text-[11px] font-medium text-brand-soft-foreground">
-                      {qs.length} 题
+                      {groups[t].length} 小题
                     </span>
                   </div>
                   <div className="flex flex-col gap-2">
-                    {qs.map((q, i) => (
+                    {groups[t].map((q, i) => (
                       <div
                         key={q.id}
                         className="flex items-start gap-2 rounded-lg border border-border p-3"
                       >
                         <span className="mt-0.5 text-xs font-semibold text-muted-foreground">
-                          {i + 1}
+                          {i + 1}.
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm text-foreground">{q.short}</p>
                           <div className="mt-1 flex items-center gap-1.5 text-[11px]">
-                            <span className="rounded bg-brand-soft px-1.5 py-0.5 font-medium text-brand-soft-foreground">
-                              {q.qType}
-                            </span>
                             <SourceBadge level={q.level} />
                             <span
                               className={cn("rounded px-1.5 py-0.5 font-medium", diffStyle[q.difficulty])}
@@ -1059,22 +1244,13 @@ function CartDrawer({
               清空题篮
             </button>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              disabled={items.length === 0}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card py-2.5 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-50"
-            >
-              <FilePlus2 className="size-4" />
-              组卷
-            </button>
-            <button
-              disabled={items.length === 0}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-sm font-medium text-brand-foreground transition hover:opacity-90 disabled:opacity-50"
-            >
-              <Check className="size-4" />
-              布置作业
-            </button>
-          </div>
+          <button
+            disabled={items.length === 0}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-sm font-medium text-brand-foreground transition hover:opacity-90 disabled:opacity-50"
+          >
+            <ClipboardList className="size-4" />
+            布置作业
+          </button>
         </div>
       </div>
     </div>
