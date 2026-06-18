@@ -5,10 +5,9 @@ import Link from "next/link"
 import {
   Search,
   Plus,
-  ChevronRight,
   ChevronDown,
   Eye,
-  ShoppingBasket,
+  ShoppingCart,
   Pencil,
   Check,
   Rows3,
@@ -16,13 +15,17 @@ import {
   PlayCircle,
   FileText,
   Sparkles,
-  SlidersHorizontal,
+  PanelLeftClose,
+  PanelLeft,
   X,
+  Trash2,
+  FilePlus2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ChapterSidebar } from "@/components/chapter-sidebar"
 import { SourceBadge, type Level } from "@/components/source-badge"
 import { Math } from "@/components/math"
+import { TextbookSwitcher } from "@/components/textbook-switcher"
 
 /* ---------------------------- 数据 ---------------------------- */
 
@@ -37,6 +40,7 @@ type Question = {
   knowledge: string[]
   tags: string[]
   stem: ReactNode
+  short: string
   options?: { key: string; content: ReactNode }[]
   answer: ReactNode
   analysis: ReactNode
@@ -54,6 +58,7 @@ const questions: Question[] = [
     difficulty: "易",
     knowledge: ["一元一次不等式", "解集表示"],
     tags: ["基础巩固", "课堂讲解"],
+    short: "不等式 2x-1>3 的解集",
     stem: (
       <>
         不等式 <Math tex="2x - 1 > 3" /> 的解集是（　　）
@@ -83,6 +88,7 @@ const questions: Question[] = [
     difficulty: "中",
     knowledge: ["一元一次不等式组", "公共解集"],
     tags: ["易错训练", "数轴表示"],
+    short: "不等式组的公共解集",
     stem: (
       <>
         不等式组{" "}
@@ -109,11 +115,8 @@ const questions: Question[] = [
     difficulty: "易",
     knowledge: ["不等式性质"],
     tags: ["概念辨析"],
-    stem: (
-      <>
-        不等式两边同时乘以同一个负数，不等号方向不变。（　　）
-      </>
-    ),
+    short: "不等式两边同乘负数，方向不变？",
+    stem: <>不等式两边同时乘以同一个负数，不等号方向不变。（　　）</>,
     answer: <span className="font-medium">错误</span>,
     analysis: (
       <>
@@ -131,6 +134,7 @@ const questions: Question[] = [
     difficulty: "难",
     knowledge: ["一元一次不等式组", "解集规律", "数轴表示"],
     tags: ["单元复习", "规律梳理", "含视频讲解"],
+    short: "总结四种不等式组的解集规律",
     stem: (
       <>
         总结四种不同类型的一元一次不等式组（设 <Math tex="a < b" />）的解集规律，并在数轴上表示。
@@ -201,6 +205,7 @@ const questions: Question[] = [
     difficulty: "中",
     knowledge: ["一元一次不等式", "实际应用"],
     tags: ["情景应用", "校本改编"],
+    short: "知识竞赛得分不低于79分",
     stem: (
       <>
         某次知识竞赛共 20 题，答对一题得 5 分，答错或不答扣 2 分。小明要得分不低于 79
@@ -257,165 +262,129 @@ function QuestionCard({
   return (
     <article
       className={cn(
-        "group rounded-xl border bg-card transition",
+        "group relative rounded-xl border bg-card transition",
         selected
           ? "border-brand ring-1 ring-brand/30"
-          : "border-border hover:border-brand/40",
+          : "border-border hover:border-brand/40 hover:shadow-sm",
       )}
     >
-      <div className="flex gap-3 p-4 sm:p-5">
-        {/* 选题勾选 */}
-        <button
-          onClick={onToggle}
-          aria-label={selected ? "取消选择" : "选择此题"}
-          className={cn(
-            "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border transition",
-            selected
-              ? "border-brand bg-brand text-brand-foreground"
-              : "border-border bg-background text-transparent hover:border-brand",
+      <div className="p-4 sm:p-5">
+        {/* 顶部元信息行 */}
+        <div className="mb-2.5 flex flex-wrap items-center gap-2 text-xs">
+          <span className="font-semibold text-muted-foreground">{index}</span>
+          <span className="rounded bg-brand-soft px-1.5 py-0.5 font-medium text-brand-soft-foreground">
+            {q.qType}
+          </span>
+          <SourceBadge level={q.level} />
+          <span className={cn("rounded px-1.5 py-0.5 font-medium", diffStyle[q.difficulty])}>
+            {q.difficulty}
+          </span>
+          {q.hasVideo && (
+            <span className="inline-flex items-center gap-0.5 rounded bg-warn/20 px-1.5 py-0.5 font-medium text-warn-foreground">
+              <PlayCircle className="size-3" />
+              视频讲解
+            </span>
           )}
-        >
-          <Check className="size-3.5" strokeWidth={3} />
-        </button>
+          <span className="ml-auto hidden text-muted-foreground sm:inline">
+            组卷 {q.used} · 已练 {q.students} 人
+          </span>
 
-        <div className="min-w-0 flex-1">
-          {/* 顶部元信息 */}
-          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-            <span className="font-semibold text-muted-foreground">{index}</span>
-            <span className="rounded bg-brand-soft px-1.5 py-0.5 font-medium text-brand-soft-foreground">
-              {q.qType}
-            </span>
-            <SourceBadge level={q.level} />
-            <span
-              className={cn(
-                "rounded px-1.5 py-0.5 font-medium",
-                diffStyle[q.difficulty],
-              )}
-            >
-              {q.difficulty}
-            </span>
-            {q.hasVideo && (
-              <span className="inline-flex items-center gap-0.5 rounded bg-warn/20 px-1.5 py-0.5 font-medium text-warn-foreground">
-                <PlayCircle className="size-3" />
-                视频讲解
-              </span>
-            )}
-            <span className="ml-auto hidden text-muted-foreground sm:inline">
-              组卷 {q.used} · 已练 {q.students} 人
-            </span>
-          </div>
-
-          {/* 题干 */}
-          <div
+          {/* 加入题篮（购物车图标，主操作） */}
+          <button
+            onClick={onToggle}
+            aria-label={selected ? "移出题篮" : "加入题篮"}
+            title={selected ? "移出题篮" : "加入题篮"}
             className={cn(
-              "text-[15px] leading-7 text-foreground",
-              compact && "line-clamp-2",
+              "inline-flex size-8 items-center justify-center rounded-lg border transition",
+              selected
+                ? "border-brand bg-brand text-brand-foreground"
+                : "border-border bg-card text-muted-foreground hover:border-brand hover:text-brand",
             )}
           >
-            {q.stem}
-          </div>
+            {selected ? <Check className="size-4" strokeWidth={3} /> : <ShoppingCart className="size-4" />}
+          </button>
+        </div>
 
-          {/* 选项 / 答案（详情模式） */}
-          {!compact && (
-            <>
-              {q.options && (
-                <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-                  {q.options.map((o) => (
-                    <div key={o.key} className="flex items-baseline gap-2 text-sm text-foreground">
-                      <span className="font-medium text-muted-foreground">{o.key}.</span>
-                      <span>{o.content}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+        {/* 题干 */}
+        <div className={cn("text-[15px] leading-7 text-foreground", compact && "line-clamp-2")}>
+          {q.stem}
+        </div>
 
-              {/* 标签 + 展开解析 */}
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                {q.knowledge.map((k) => (
-                  <span
-                    key={k}
-                    className="rounded-md bg-brand-soft px-2 py-0.5 text-[11px] font-medium text-brand-soft-foreground"
-                  >
-                    {k}
-                  </span>
-                ))}
-                {q.tags.map((t) => (
-                  <span
-                    key={t}
-                    className="rounded-md border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
-                  >
-                    {t}
-                  </span>
-                ))}
-                <button
-                  onClick={() => setShowAnalysis((v) => !v)}
-                  className="ml-auto inline-flex items-center gap-0.5 rounded-md px-2 py-0.5 text-xs font-medium text-brand hover:bg-brand-soft"
-                >
-                  答案解析
-                  <ChevronDown
-                    className={cn("size-3.5 transition", showAnalysis && "rotate-180")}
-                  />
-                </button>
+        {/* 选项（详情模式） */}
+        {!compact && q.options && (
+          <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+            {q.options.map((o) => (
+              <div key={o.key} className="flex items-baseline gap-2 text-sm text-foreground">
+                <span className="font-medium text-muted-foreground">{o.key}.</span>
+                <span>{o.content}</span>
               </div>
+            ))}
+          </div>
+        )}
 
-              {showAnalysis && (
-                <div className="mt-3 space-y-2 rounded-lg bg-muted/60 p-3 text-sm leading-7">
-                  <div className="flex gap-2">
-                    <span className="shrink-0 font-medium text-brand">【答案】</span>
-                    <div>{q.answer}</div>
-                  </div>
-                  <div className="flex gap-2 text-muted-foreground">
-                    <span className="shrink-0 font-medium text-foreground">【解析】</span>
-                    <div>{q.analysis}</div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+        {/* 标签行（突出展示，含知识点 + 标签） */}
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {q.knowledge.map((k) => (
+            <span
+              key={k}
+              className="rounded-md bg-brand-soft px-2 py-0.5 text-[11px] font-medium text-brand-soft-foreground"
+            >
+              # {k}
+            </span>
+          ))}
+          {!compact &&
+            q.tags.map((t) => (
+              <span
+                key={t}
+                className="rounded-md border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+              >
+                {t}
+              </span>
+            ))}
 
-          {/* 精简模式：标签一行 */}
-          {compact && (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {q.knowledge.slice(0, 3).map((k) => (
-                <span
-                  key={k}
-                  className="rounded-md bg-brand-soft px-2 py-0.5 text-[11px] font-medium text-brand-soft-foreground"
+          {/* 次要操作：弱化为文字/图标 */}
+          {!compact && (
+            <div className="ml-auto flex items-center gap-1">
+              <button
+                onClick={() => setShowAnalysis((v) => !v)}
+                className="inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-xs font-medium text-brand hover:bg-brand-soft"
+              >
+                答案解析
+                <ChevronDown className={cn("size-3.5 transition", showAnalysis && "rotate-180")} />
+              </button>
+              <button
+                aria-label="预览"
+                title="预览"
+                className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <Eye className="size-4" />
+              </button>
+              {q.editable && (
+                <button
+                  aria-label="编辑"
+                  title="编辑"
+                  className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 >
-                  {k}
-                </span>
-              ))}
+                  <Pencil className="size-4" />
+                </button>
+              )}
             </div>
           )}
-
-          {/* 动作行 */}
-          <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
-            <button
-              onClick={onToggle}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium transition",
-                selected
-                  ? "bg-brand-soft text-brand-soft-foreground"
-                  : "bg-brand text-brand-foreground hover:opacity-90",
-              )}
-            >
-              <ShoppingBasket className="size-4" />
-              {selected ? "已加入题篮" : "加入题篮"}
-            </button>
-            <button className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:border-brand/40 hover:text-foreground">
-              <Eye className="size-3.5" />
-              预览
-            </button>
-            {q.editable && (
-              <button className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:border-brand/40 hover:text-foreground">
-                <Pencil className="size-3.5" />
-                编辑
-              </button>
-            )}
-            <span className="ml-auto text-xs text-muted-foreground sm:hidden">
-              组卷 {q.used}
-            </span>
-          </div>
         </div>
+
+        {/* 解析展开 */}
+        {!compact && showAnalysis && (
+          <div className="mt-3 space-y-2 rounded-lg bg-muted/60 p-3 text-sm leading-7">
+            <div className="flex gap-2">
+              <span className="shrink-0 font-medium text-brand">【答案】</span>
+              <div>{q.answer}</div>
+            </div>
+            <div className="flex gap-2 text-muted-foreground">
+              <span className="shrink-0 font-medium text-foreground">【解析】</span>
+              <div>{q.analysis}</div>
+            </div>
+          </div>
+        )}
       </div>
     </article>
   )
@@ -429,8 +398,11 @@ export function ResourceWorkbench() {
   const [source, setSource] = useState<"全部" | Level>("全部")
   const [diff, setDiff] = useState<"全部" | Difficulty>("全部")
   const [compact, setCompact] = useState(false)
-  const [selected, setSelected] = useState<string[]>([])
-  const [chapterOpen, setChapterOpen] = useState(true)
+  const [moreFilters, setMoreFilters] = useState(false)
+  const [selected, setSelected] = useState<string[]>(["q1"])
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [cartOpen, setCartOpen] = useState(false)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
 
   const toggle = (id: string) =>
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
@@ -446,23 +418,33 @@ export function ResourceWorkbench() {
     [qType, source, diff],
   )
 
-  return (
-    <div className="flex min-h-full flex-col">
-      {/* 贴顶工具栏 */}
-      <div className="sticky top-0 z-10 border-b border-border bg-background/85 backdrop-blur">
-        <div className="flex flex-wrap items-center gap-3 px-6 py-3">
-          <nav className="flex items-center gap-1 text-[13px] text-muted-foreground">
-            {["七年级下", "第15章 一元一次不等式"].map((b, i, arr) => (
-              <span key={b} className="flex items-center gap-1">
-                <span className={cn(i === arr.length - 1 && "font-semibold text-foreground")}>
-                  {b}
-                </span>
-                {i < arr.length - 1 && <ChevronRight className="size-3.5" />}
-              </span>
-            ))}
-          </nav>
+  const cartItems = questions.filter((q) => selected.includes(q.id))
 
-          {/* 资源类型分段控制 */}
+  return (
+    <div className="flex h-full min-h-0">
+      {/* 左侧目录栏 */}
+      <aside
+        className={cn(
+          "hidden shrink-0 overflow-y-auto border-r border-border bg-card transition-all lg:block",
+          sidebarOpen ? "w-64 p-3" : "w-0 overflow-hidden p-0",
+        )}
+      >
+        {sidebarOpen && <ChapterSidebar onSwitchTextbook={() => setSwitcherOpen(true)} />}
+      </aside>
+
+      {/* 主区域 */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* 工具栏（无面包屑） */}
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-border bg-background/85 px-5 py-3 backdrop-blur">
+          <button
+            onClick={() => setSidebarOpen((v) => !v)}
+            aria-label={sidebarOpen ? "收起目录" : "展开目录"}
+            className="hidden size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:text-foreground lg:inline-flex"
+          >
+            {sidebarOpen ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
+          </button>
+
+          {/* 资源类型分段 */}
           <div className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
             {resourceTypes.map((t) => (
               <button
@@ -488,6 +470,25 @@ export function ResourceWorkbench() {
             />
           </div>
 
+          {/* 常驻购物车题篮 */}
+          <button
+            onClick={() => setCartOpen(true)}
+            className="relative inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:border-brand/40"
+          >
+            <ShoppingCart className="size-4 text-brand" />
+            题篮
+            <span
+              className={cn(
+                "grid min-w-5 place-items-center rounded-full px-1 text-[11px] font-bold tabular-nums",
+                selected.length
+                  ? "bg-brand text-brand-foreground"
+                  : "bg-muted text-muted-foreground",
+              )}
+            >
+              {selected.length}
+            </span>
+          </button>
+
           <Link
             href="/new-question"
             className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
@@ -496,36 +497,24 @@ export function ResourceWorkbench() {
             新增题目
           </Link>
         </div>
-      </div>
 
-      <div className="flex flex-1 gap-0">
-        {/* 章节栏 */}
-        <aside
-          className={cn(
-            "hidden shrink-0 border-r border-border bg-card transition-all lg:block",
-            chapterOpen ? "w-64" : "w-0 overflow-hidden",
-          )}
-        >
-          <div className="sticky top-[57px] p-4">
-            <ChapterSidebar />
-          </div>
-        </aside>
-
-        {/* 主内容 */}
-        <main className="min-w-0 flex-1">
-          {/* 筛选条 */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-6 py-3">
+        {/* 筛选条：默认露出来源四级 + 展开更多 */}
+        <div className="flex flex-col gap-2 border-b border-border px-5 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <FilterGroup
+              label="来源"
+              items={sourceFilters}
+              active={source}
+              onChange={(v) => setSource(v as typeof source)}
+              renderItem={(it) => (it === "全部" ? "全部" : `${it}级`.replace("我级", "我的"))}
+            />
             <button
-              onClick={() => setChapterOpen((v) => !v)}
-              className="hidden items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition hover:text-foreground lg:inline-flex"
+              onClick={() => setMoreFilters((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition hover:text-foreground"
             >
-              <SlidersHorizontal className="size-3.5" />
-              {chapterOpen ? "收起目录" : "展开目录"}
+              更多筛选
+              <ChevronDown className={cn("size-3.5 transition", moreFilters && "rotate-180")} />
             </button>
-
-            <FilterGroup label="来源" items={sourceFilters} active={source} onChange={(v) => setSource(v as typeof source)} />
-            <FilterGroup label="题型" items={qTypeFilters} active={qType} onChange={(v) => setQType(v as typeof qType)} />
-            <FilterGroup label="难度" items={diffFilters} active={diff} onChange={(v) => setDiff(v as typeof diff)} />
 
             <div className="ml-auto flex items-center gap-3">
               <span className="text-xs text-muted-foreground">
@@ -556,52 +545,51 @@ export function ResourceWorkbench() {
             </div>
           </div>
 
-          {/* 列表 */}
-          <div className="px-6 py-4">
-            {resourceType === "题目" ? (
-              <div className={cn("flex flex-col", compact ? "gap-2" : "gap-3", "pb-24")}>
-                {filtered.map((q, i) => (
-                  <QuestionCard
-                    key={q.id}
-                    q={q}
-                    index={i + 1}
-                    selected={selected.includes(q.id)}
-                    compact={compact}
-                    onToggle={() => toggle(q.id)}
-                  />
-                ))}
-                {filtered.length === 0 && (
-                  <div className="py-20 text-center text-sm text-muted-foreground">
-                    当前筛选下暂无题目，换个条件试试
-                  </div>
-                )}
-              </div>
-            ) : (
-              <OtherResourcePlaceholder type={resourceType} />
-            )}
-          </div>
-        </main>
+          {moreFilters && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-2.5">
+              <FilterGroup label="题型" items={qTypeFilters} active={qType} onChange={(v) => setQType(v as typeof qType)} />
+              <FilterGroup label="难度" items={diffFilters} active={diff} onChange={(v) => setDiff(v as typeof diff)} />
+            </div>
+          )}
+        </div>
+
+        {/* 列表（核心阅读区，可滚动） */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {resourceType === "题目" ? (
+            <div className={cn("flex flex-col", compact ? "gap-2" : "gap-3")}>
+              {filtered.map((q, i) => (
+                <QuestionCard
+                  key={q.id}
+                  q={q}
+                  index={i + 1}
+                  selected={selected.includes(q.id)}
+                  compact={compact}
+                  onToggle={() => toggle(q.id)}
+                />
+              ))}
+              {filtered.length === 0 && (
+                <div className="py-20 text-center text-sm text-muted-foreground">
+                  当前筛选下暂无题目，换个条件试试
+                </div>
+              )}
+            </div>
+          ) : (
+            <OtherResourcePlaceholder type={resourceType} />
+          )}
+        </div>
       </div>
 
-      {/* 题篮浮条 */}
-      {selected.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-card px-5 py-2.5 shadow-lg">
-          <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <ShoppingBasket className="size-4 text-brand" />
-            题篮 {selected.length} 题
-          </span>
-          <button className="rounded-full bg-brand px-4 py-1.5 text-sm font-medium text-brand-foreground transition hover:opacity-90">
-            组卷 / 布置
-          </button>
-          <button
-            onClick={() => setSelected([])}
-            className="rounded-full p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            aria-label="清空题篮"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
+      {/* 题篮抽屉 */}
+      <CartDrawer
+        open={cartOpen}
+        items={cartItems}
+        onClose={() => setCartOpen(false)}
+        onRemove={(id) => toggle(id)}
+        onClear={() => setSelected([])}
+      />
+
+      {/* 教材切换弹窗 */}
+      <TextbookSwitcher open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
     </div>
   )
 }
@@ -613,11 +601,13 @@ function FilterGroup<T extends string>({
   items,
   active,
   onChange,
+  renderItem,
 }: {
   label: string
   items: readonly T[]
   active: T
   onChange: (v: T) => void
+  renderItem?: (v: T) => string
 }) {
   return (
     <div className="flex items-center gap-1.5">
@@ -634,7 +624,7 @@ function FilterGroup<T extends string>({
                 : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
-            {it}
+            {renderItem ? renderItem(it) : it}
           </button>
         ))}
       </div>
@@ -642,10 +632,109 @@ function FilterGroup<T extends string>({
   )
 }
 
+function CartDrawer({
+  open,
+  items,
+  onClose,
+  onRemove,
+  onClear,
+}: {
+  open: boolean
+  items: Question[]
+  onClose: () => void
+  onRemove: (id: string) => void
+  onClear: () => void
+}) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50">
+      <button className="absolute inset-0 bg-foreground/30 backdrop-blur-sm" onClick={onClose} aria-label="关闭" />
+      <div className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col border-l border-border bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="flex items-center gap-2 text-base font-bold text-foreground">
+            <ShoppingCart className="size-4 text-brand" />
+            题篮 · {items.length} 题
+          </h2>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {items.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+              <ShoppingCart className="size-10 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">题篮还是空的</p>
+              <p className="max-w-[16rem] text-xs text-muted-foreground/80">
+                浏览题目时点右上角购物车图标，把题加进来，再统一组卷或布置。
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {items.map((q, i) => (
+                <div key={q.id} className="flex items-start gap-2 rounded-lg border border-border p-3">
+                  <span className="mt-0.5 text-xs font-semibold text-muted-foreground">{i + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-foreground">{q.short}</p>
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px]">
+                      <span className="rounded bg-brand-soft px-1.5 py-0.5 font-medium text-brand-soft-foreground">
+                        {q.qType}
+                      </span>
+                      <SourceBadge level={q.level} />
+                      <span className={cn("rounded px-1.5 py-0.5 font-medium", diffStyle[q.difficulty])}>
+                        {q.difficulty}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => onRemove(q.id)}
+                    aria-label="移出"
+                    className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-border p-4">
+          {items.length > 0 && (
+            <button
+              onClick={onClear}
+              className="mb-3 text-xs text-muted-foreground transition hover:text-destructive"
+            >
+              清空题篮
+            </button>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              disabled={items.length === 0}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card py-2.5 text-sm font-medium text-foreground transition hover:bg-muted disabled:opacity-50"
+            >
+              <FilePlus2 className="size-4" />
+              组卷
+            </button>
+            <button
+              disabled={items.length === 0}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-sm font-medium text-brand-foreground transition hover:opacity-90 disabled:opacity-50"
+            >
+              <Check className="size-4" />
+              布置作业
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function OtherResourcePlaceholder({ type }: { type: string }) {
-  const icon =
-    type === "微课" ? PlayCircle : type === "备课" ? FileText : Sparkles
-  const Icon = icon
+  const Icon = type === "微课" ? PlayCircle : type === "备课" ? FileText : Sparkles
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-24 text-center">
       <div className="flex size-12 items-center justify-center rounded-full bg-brand-soft text-brand">
