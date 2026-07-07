@@ -28,13 +28,14 @@ import { ChapterSidebar } from "@/components/chapter-sidebar"
 import { SourceBadge, type Level } from "@/components/source-badge"
 import { Math } from "@/components/math"
 import { TextbookSwitcher } from "@/components/textbook-switcher"
+import { ExerciseComposer } from "@/components/exercise-composer"
 
 /* ---------------------------- 数据 ---------------------------- */
 
-type QType = "单选" | "多选" | "填空" | "判断" | "主观"
-type Difficulty = "易" | "中" | "难"
+export type QType = "单选" | "多选" | "填空" | "判断" | "主观"
+export type Difficulty = "易" | "中" | "难"
 
-type Question = {
+export type Question = {
   id: string
   qType: QType
   level: Level
@@ -841,6 +842,7 @@ export function ResourceWorkbench() {
   const [cartOpen, setCartOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [previewPaper, setPreviewPaper] = useState<ResItem | null>(null)
+  const [composing, setComposing] = useState(false)
 
   const toggle = (id: string) =>
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
@@ -883,7 +885,13 @@ export function ResourceWorkbench() {
 
       {/* 主区域 */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {previewPaper ? (
+        {composing ? (
+          <ExerciseComposer
+            items={cartItems}
+            onBack={() => setComposing(false)}
+            onRemove={(id) => toggle(id)}
+          />
+        ) : previewPaper ? (
           <PaperDetail
             paper={previewPaper}
             premium={isPremium}
@@ -1065,10 +1073,13 @@ export function ResourceWorkbench() {
         )}
       </div>
 
-      {/* 右侧悬浮题篮球 */}
+      {/* 右侧悬浮题篮球（组卷时隐藏，避免与操作栏重叠） */}
       <button
         onClick={() => setCartOpen(true)}
-        className="fixed bottom-8 right-6 z-30 flex flex-col items-center gap-0.5 rounded-2xl bg-brand px-3.5 py-3 text-brand-foreground shadow-lg shadow-brand/30 transition hover:opacity-95"
+        className={cn(
+          "fixed bottom-8 right-6 z-30 flex flex-col items-center gap-0.5 rounded-2xl bg-brand px-3.5 py-3 text-brand-foreground shadow-lg shadow-brand/30 transition hover:opacity-95",
+          composing && "hidden",
+        )}
       >
         <ShoppingCart className="size-5" />
         <span className="text-[11px] font-medium leading-none">题篮</span>
@@ -1086,6 +1097,11 @@ export function ResourceWorkbench() {
         onClose={() => setCartOpen(false)}
         onRemove={(id) => toggle(id)}
         onClear={() => setSelected([])}
+        onGenerate={() => {
+          setCartOpen(false)
+          setPreviewPaper(null)
+          setComposing(true)
+        }}
       />
 
       {/* 教材切换弹窗 */}
@@ -1138,12 +1154,14 @@ function CartDrawer({
   onClose,
   onRemove,
   onClear,
+  onGenerate,
 }: {
   open: boolean
   items: Question[]
   onClose: () => void
   onRemove: (id: string) => void
   onClear: () => void
+  onGenerate: () => void
 }) {
   if (!open) return null
 
@@ -1245,11 +1263,12 @@ function CartDrawer({
             </button>
           )}
           <button
+            onClick={onGenerate}
             disabled={items.length === 0}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-sm font-medium text-brand-foreground transition hover:opacity-90 disabled:opacity-50"
           >
             <ClipboardList className="size-4" />
-            布置作业
+            生成练习
           </button>
         </div>
       </div>
