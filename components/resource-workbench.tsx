@@ -58,7 +58,7 @@ export type Question = {
   editable?: boolean
 }
 
-const questions: Question[] = [
+export const questions: Question[] = [
   {
     id: "q1",
     qType: "单选",
@@ -230,7 +230,7 @@ const questions: Question[] = [
     level: "我",
     difficulty: "中",
     group: "第15章 一元一次不等式 · 综合提升",
-    knowledge: ["一元一次不等式", "实际应用"],
+    knowledge: ["一元一次不���式", "实际应用"],
     literacy: ["数学建模", "数学运算"],
     cognitive: "应用",
     tags: ["情景应用", "校本改编"],
@@ -485,7 +485,7 @@ function QuestionCard({
         {/* 虚线分隔：题干 / 标签 */}
         <div className="my-3 border-t border-dashed border-border" />
 
-        {/* 标签行 + 右下角两个操作 */}
+        {/* 标��行 + 右下角两个操作 */}
         <div className="flex flex-wrap items-center gap-1.5">
           {q.knowledge.map((k) => (
             <span
@@ -873,14 +873,14 @@ export function ResourceWorkbench() {
 
   return (
     <div className="relative flex h-full min-h-0">
-      {/* 左侧目录栏 */}
+      {/* 左侧目录栏（组卷/生成练习时隐藏） */}
       <aside
         className={cn(
           "hidden shrink-0 overflow-y-auto border-r border-border bg-card transition-all lg:block",
-          sidebarOpen ? "w-64 p-3" : "w-0 overflow-hidden p-0",
+          sidebarOpen && !composing ? "w-64 p-3" : "w-0 overflow-hidden p-0",
         )}
       >
-        {sidebarOpen && <ChapterSidebar onSwitchTextbook={() => setSwitcherOpen(true)} />}
+        {sidebarOpen && !composing && <ChapterSidebar onSwitchTextbook={() => setSwitcherOpen(true)} />}
       </aside>
 
       {/* 主区域 */}

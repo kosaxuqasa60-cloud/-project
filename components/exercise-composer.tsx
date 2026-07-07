@@ -15,17 +15,21 @@ import {
   Sparkles,
   X,
   Trash2,
-  ArrowUp,
-  ArrowDown,
   PlayCircle,
   Play,
   Check,
   Info,
   Settings2,
+  GripVertical,
+  Plus,
+  Pencil,
+  Search,
+  ListPlus,
+  CornerDownRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SourceBadge } from "@/components/source-badge"
-import type { Question, QType } from "@/components/resource-workbench"
+import { questions as bank, type Question, type QType } from "@/components/resource-workbench"
 
 /* 题型顺序与大题标题 */
 const TYPE_ORDER: QType[] = ["单选", "多选", "填空", "判断", "主观"]
@@ -36,7 +40,7 @@ const TYPE_LABEL: Record<QType, string> = {
   判断: "判断题",
   主观: "主观题",
 }
-const CN_NUM = ["一", "二", "三", "四", "五", "六", "七", "八"]
+const CN_NUM = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
 
 /* 各题型默认分值 */
 const DEFAULT_SCORE: Record<QType, number> = {
@@ -47,6 +51,9 @@ const DEFAULT_SCORE: Record<QType, number> = {
   主观: 8,
 }
 
+/* 每题的“问数”（用于按问赋分）：主观 3 问、填空 2 问、其余 1 问 */
+const subCountOf = (q: Question) => (q.qType === "主观" ? 3 : q.qType === "填空" ? 2 : 1)
+
 const diffStyle: Record<string, string> = {
   易: "text-easy bg-easy/10",
   中: "text-medium bg-medium/15",
@@ -55,6 +62,8 @@ const diffStyle: Record<string, string> = {
 
 type AudioInfo = { name: string; duration: string; source: string }
 type DrawerKey = "info" | "score" | "order"
+type Section = { id: string; title: string; questionIds: string[]; collapsed: boolean }
+type DragState = { kind: "sec" | "q"; id: string } | null
 
 export function ExerciseComposer({
   items,
@@ -66,82 +75,109 @@ export function ExerciseComposer({
   onRemove: (id: string) => void
 }) {
   const [name, setName] = useState("第15章 一元一次不等式 · 课堂练习")
-  const [drawer, setDrawer] = useState<DrawerKey | null>("info")
+  const [drawer, setDrawer] = useState<DrawerKey | null>("order")
 
-  /* 顺序状态：大题顺序 + 全局小题顺序 */
-  const presentTypes = useMemo(
-    () => TYPE_ORDER.filter((t) => items.some((q) => q.qType === t)),
-    [items],
-  )
-  const [typeSeq, setTypeSeq] = useState<QType[]>(presentTypes)
-  const [order, setOrder] = useState<string[]>(items.map((q) => q.id))
+  /* 题库映射（含跟进练习可选题） */
+  const bankMap = useMemo(() => Object.fromEntries(bank.map((q) => [q.id, q])), [])
+  const lookup = (id: string) => bankMap[id] as Question | undefined
+
+  /* 大题（section）模型：按题型初始化，可自定义 */
+  const [sections, setSections] = useState<Section[]>(() => {
+    const present = TYPE_ORDER.filter((t) => items.some((q) => q.qType === t))
+    return present.map((t) => ({
+      id: "sec-" + t,
+      title: TYPE_LABEL[t],
+      questionIds: items.filter((q) => q.qType === t).map((q) => q.id),
+      collapsed: false,
+    }))
+  })
 
   /* 分值：按题型 + 单题覆盖 */
-  const [typeScore, setTypeScore] = useState<Record<string, number>>(() => {
+  const [typeScore] = useState<Record<string, number>>(() => {
     const base: Record<string, number> = {}
     TYPE_ORDER.forEach((t) => (base[t] = DEFAULT_SCORE[t]))
     return base
   })
   const [overrides, setOverrides] = useState<Record<string, number>>({})
 
-  /* 作业信息 */
+  /* 作业信息（无练习说明） */
   const [classes, setClasses] = useState<string[]>(["七(1)班", "七(2)班"])
   const [due, setDue] = useState("2026-07-14")
   const [answerMode, setAnswerMode] = useState("点阵笔纸质")
-  const [note, setNote] = useState("")
 
-  /* 题目音频 */
+  /* 题目音频 & 跟进练习 */
   const [audios, setAudios] = useState<Record<string, AudioInfo>>({})
   const [audioModal, setAudioModal] = useState<{ id: string; mode: "add" | "settings" } | null>(null)
+  const [followUps, setFollowUps] = useState<Record<string, string[]>>({})
+  const [pickerFor, setPickerFor] = useState<string | null>(null)
+
+  /* 拖拽 */
+  const [drag, setDrag] = useState<DragState>(null)
 
   /* —— 计算 —— */
-  const itemMap = useMemo(() => Object.fromEntries(items.map((q) => [q.id, q])), [items])
-  const validTypeSeq = typeSeq.filter((t) => items.some((q) => q.qType === t))
-
+  const allIds = sections.flatMap((s) => s.questionIds)
   const scoreOf = (q: Question) => overrides[q.id] ?? typeScore[q.qType] ?? 0
-  const total = items.reduce((s, q) => s + scoreOf(q), 0)
+  const total = allIds.reduce((s, id) => {
+    const q = lookup(id)
+    return q ? s + scoreOf(q) : s
+  }, 0)
 
-  const groupedIds = (t: QType) =>
-    order.filter((id) => itemMap[id]?.qType === t)
+  /* —— 大题操作 —— */
+  const addSection = () =>
+    setSections((p) => [
+      ...p,
+      { id: "sec-" + Date.now(), title: "新大题", questionIds: [], collapsed: false },
+    ])
+  const renameSection = (id: string, title: string) =>
+    setSections((p) => p.map((s) => (s.id === id ? { ...s, title } : s)))
+  const deleteSection = (id: string) =>
+    setSections((p) => p.filter((s) => !(s.id === id && s.questionIds.length === 0)))
+  const toggleCollapse = (id: string) =>
+    setSections((p) => p.map((s) => (s.id === id ? { ...s, collapsed: !s.collapsed } : s)))
 
-  /* —— 排序操作 —— */
-  const moveType = (t: QType, dir: -1 | 1) => {
-    setTypeSeq((prev) => {
+  /* —— 排序（拖拽） —— */
+  const reorderSections = (fromId: string, toId: string) =>
+    setSections((prev) => {
       const arr = [...prev]
-      const i = arr.indexOf(t)
-      const j = i + dir
-      if (j < 0 || j >= arr.length) return prev
-      ;[arr[i], arr[j]] = [arr[j], arr[i]]
+      const from = arr.findIndex((s) => s.id === fromId)
+      const to = arr.findIndex((s) => s.id === toId)
+      if (from < 0 || to < 0 || from === to) return prev
+      const [m] = arr.splice(from, 1)
+      arr.splice(to, 0, m)
       return arr
     })
-  }
-  const moveQuestion = (id: string, dir: -1 | 1) => {
-    setOrder((prev) => {
-      const q = itemMap[id]
-      const sameType = prev.filter((x) => itemMap[x]?.qType === q.qType)
-      const localIdx = sameType.indexOf(id)
-      const targetLocal = localIdx + dir
-      if (targetLocal < 0 || targetLocal >= sameType.length) return prev
-      const swapId = sameType[targetLocal]
-      const arr = [...prev]
-      const a = arr.indexOf(id)
-      const b = arr.indexOf(swapId)
-      ;[arr[a], arr[b]] = [arr[b], arr[a]]
-      return arr
+  const moveQuestion = (qId: string, targetSecId: string, targetQId: string | null) =>
+    setSections((prev) => {
+      let next = prev.map((s) => ({ ...s, questionIds: s.questionIds.filter((x) => x !== qId) }))
+      next = next.map((s) => {
+        if (s.id !== targetSecId) return s
+        const arr = [...s.questionIds]
+        const idx = targetQId ? arr.indexOf(targetQId) : arr.length
+        arr.splice(idx < 0 ? arr.length : idx, 0, qId)
+        return { ...s, questionIds: arr }
+      })
+      return next
     })
-  }
 
-  const setAudio = (id: string, info: AudioInfo) =>
-    setAudios((p) => ({ ...p, [id]: info }))
+  /* —— 移出 / 音频 / 跟进 —— */
+  const handleRemove = (id: string) => {
+    setSections((p) => p.map((s) => ({ ...s, questionIds: s.questionIds.filter((x) => x !== id) })))
+    onRemove(id)
+  }
+  const setAudio = (id: string, info: AudioInfo) => setAudios((p) => ({ ...p, [id]: info }))
   const removeAudio = (id: string) =>
     setAudios((p) => {
       const n = { ...p }
       delete n[id]
       return n
     })
+  const addFollowUps = (qId: string, ids: string[]) =>
+    setFollowUps((p) => ({ ...p, [qId]: Array.from(new Set([...(p[qId] ?? []), ...ids])) }))
+  const removeFollowUp = (qId: string, fid: string) =>
+    setFollowUps((p) => ({ ...p, [qId]: (p[qId] ?? []).filter((x) => x !== fid) }))
 
   /* —— 空态 —— */
-  if (items.length === 0) {
+  if (allIds.length === 0 && sections.every((s) => s.questionIds.length === 0)) {
     return (
       <div className="flex h-full min-h-0 flex-col">
         <ComposerHeader name={name} setName={setName} total={0} count={0} classes={classes} onBack={onBack} />
@@ -162,57 +198,97 @@ export function ExerciseComposer({
     <div className="flex h-full min-h-0">
       {/* 主编辑区 */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <ComposerHeader name={name} setName={setName} total={total} count={items.length} classes={classes} onBack={onBack} />
+        <ComposerHeader name={name} setName={setName} total={total} count={allIds.length} classes={classes} onBack={onBack} />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           <div className="mx-auto flex max-w-3xl flex-col gap-6">
-            {validTypeSeq.map((t, ti) => {
-              const ids = groupedIds(t)
-              if (ids.length === 0) return null
-              const groupScore = ids.reduce((s, id) => s + scoreOf(itemMap[id]), 0)
+            {sections.map((sec, si) => {
+              const ids = sec.questionIds
+              const groupScore = ids.reduce((s, id) => {
+                const q = lookup(id)
+                return q ? s + scoreOf(q) : s
+              }, 0)
               return (
-                <section key={t}>
-                  {/* 大题标题 */}
+                <section
+                  key={sec.id}
+                  onDragOver={(e) => drag?.kind === "q" && e.preventDefault()}
+                  onDrop={() => {
+                    if (drag?.kind === "q") moveQuestion(drag.id, sec.id, null)
+                    setDrag(null)
+                  }}
+                >
+                  {/* 大题标题（可收起） */}
                   <div className="mb-2.5 flex items-center gap-2">
+                    <button
+                      onClick={() => toggleCollapse(sec.id)}
+                      className="rounded p-0.5 text-muted-foreground transition hover:text-foreground"
+                      aria-label={sec.collapsed ? "展开大题" : "收起大题"}
+                    >
+                      <ChevronDown className={cn("size-4 transition", sec.collapsed && "-rotate-90")} />
+                    </button>
                     <h2 className="text-[15px] font-bold text-foreground">
-                      {CN_NUM[ti]}、{TYPE_LABEL[t]}
+                      {CN_NUM[si]}、{sec.title}
                     </h2>
                     <span className="text-xs text-muted-foreground">
                       共 {ids.length} 小题 · 计 {groupScore} 分
                     </span>
                   </div>
-                  <div className="flex flex-col gap-3">
-                    {ids.map((id, i) => {
-                      globalIdx += 1
-                      return (
-                        <ComposerQuestionCard
-                          key={id}
-                          q={itemMap[id]}
-                          index={globalIdx}
-                          score={scoreOf(itemMap[id])}
-                          audio={audios[id]}
-                          isFirst={i === 0}
-                          isLast={i === ids.length - 1}
-                          onMoveUp={() => moveQuestion(id, -1)}
-                          onMoveDown={() => moveQuestion(id, 1)}
-                          onRemove={() => onRemove(id)}
-                          onAddAudio={() => setAudioModal({ id, mode: "add" })}
-                          onAudioSettings={() => setAudioModal({ id, mode: "settings" })}
-                          onRemoveAudio={() => removeAudio(id)}
-                        />
-                      )
-                    })}
-                  </div>
+                  {!sec.collapsed && (
+                    <div className="flex flex-col gap-3">
+                      {ids.length === 0 && (
+                        <div className="rounded-xl border border-dashed border-border py-6 text-center text-xs text-muted-foreground">
+                          该大题暂无题目，可在“题型及排序”中拖入题目
+                        </div>
+                      )}
+                      {ids.map((id) => {
+                        const q = lookup(id)
+                        if (!q) return null
+                        globalIdx += 1
+                        return (
+                          <ComposerQuestionCard
+                            key={id}
+                            q={q}
+                            index={globalIdx}
+                            score={scoreOf(q)}
+                            audio={audios[id]}
+                            followUps={(followUps[id] ?? []).map(lookup).filter(Boolean) as Question[]}
+                            dragging={drag?.kind === "q" && drag.id === id}
+                            onDragStart={() => setDrag({ kind: "q", id })}
+                            onDragEnd={() => setDrag(null)}
+                            onDropBefore={() => {
+                              if (drag?.kind === "q" && drag.id !== id) moveQuestion(drag.id, sec.id, id)
+                              setDrag(null)
+                            }}
+                            onRemove={() => handleRemove(id)}
+                            onAddAudio={() => setAudioModal({ id, mode: "add" })}
+                            onAudioSettings={() => setAudioModal({ id, mode: "settings" })}
+                            onRemoveAudio={() => removeAudio(id)}
+                            onAddFollowUp={() => setPickerFor(id)}
+                            onRemoveFollowUp={(fid) => removeFollowUp(id, fid)}
+                          />
+                        )
+                      })}
+                    </div>
+                  )}
                 </section>
               )
             })}
+
+            {/* 自定义新增大题 */}
+            <button
+              onClick={addSection}
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-3 text-sm font-medium text-muted-foreground transition hover:border-brand hover:text-brand"
+            >
+              <Plus className="size-4" />
+              自定义新增大题
+            </button>
           </div>
         </div>
       </div>
 
       {/* 右侧抽屉面板 */}
       {drawer && (
-        <div className="hidden w-[340px] shrink-0 flex-col border-l border-border bg-card md:flex">
+        <div className="hidden w-[360px] shrink-0 flex-col border-l border-border bg-card md:flex">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h3 className="text-sm font-bold text-foreground">
               {drawer === "info" ? "作业信息" : drawer === "score" ? "分值设置" : "题型及排序"}
@@ -236,30 +312,31 @@ export function ExerciseComposer({
                 setDue={setDue}
                 answerMode={answerMode}
                 setAnswerMode={setAnswerMode}
-                note={note}
-                setNote={setNote}
               />
             )}
             {drawer === "score" && (
               <ScorePanel
-                validTypeSeq={validTypeSeq}
-                groupedIds={groupedIds}
-                itemMap={itemMap}
-                typeScore={typeScore}
-                setTypeScore={setTypeScore}
+                sections={sections}
+                lookup={lookup}
                 overrides={overrides}
                 setOverrides={setOverrides}
                 scoreOf={scoreOf}
                 total={total}
+                allIds={allIds}
               />
             )}
             {drawer === "order" && (
               <OrderPanel
-                validTypeSeq={validTypeSeq}
-                groupedIds={groupedIds}
-                itemMap={itemMap}
-                moveType={moveType}
+                sections={sections}
+                lookup={lookup}
+                drag={drag}
+                setDrag={setDrag}
+                reorderSections={reorderSections}
                 moveQuestion={moveQuestion}
+                renameSection={renameSection}
+                deleteSection={deleteSection}
+                toggleCollapse={toggleCollapse}
+                addSection={addSection}
               />
             )}
           </div>
@@ -274,15 +351,28 @@ export function ExerciseComposer({
       </nav>
 
       {/* 题目音频弹窗 */}
-      {audioModal && (
+      {audioModal && lookup(audioModal.id) && (
         <AudioModal
           mode={audioModal.mode}
-          question={itemMap[audioModal.id]}
+          question={lookup(audioModal.id)!}
           audio={audios[audioModal.id]}
           onClose={() => setAudioModal(null)}
           onConfirm={(info) => {
             setAudio(audioModal.id, info)
             setAudioModal(null)
+          }}
+        />
+      )}
+
+      {/* 跟进练习选题弹窗 */}
+      {pickerFor && lookup(pickerFor) && (
+        <QuestionPickerModal
+          anchor={lookup(pickerFor)!}
+          exclude={[...allIds, ...(followUps[pickerFor] ?? []), pickerFor]}
+          onClose={() => setPickerFor(null)}
+          onConfirm={(ids) => {
+            addFollowUps(pickerFor, ids)
+            setPickerFor(null)
           }}
         />
       )}
@@ -351,51 +441,55 @@ function ComposerQuestionCard({
   index,
   score,
   audio,
-  isFirst,
-  isLast,
-  onMoveUp,
-  onMoveDown,
+  followUps,
+  dragging,
+  onDragStart,
+  onDragEnd,
+  onDropBefore,
   onRemove,
   onAddAudio,
   onAudioSettings,
   onRemoveAudio,
+  onAddFollowUp,
+  onRemoveFollowUp,
 }: {
   q: Question
   index: number
   score: number
   audio?: AudioInfo
-  isFirst: boolean
-  isLast: boolean
-  onMoveUp: () => void
-  onMoveDown: () => void
+  followUps: Question[]
+  dragging: boolean
+  onDragStart: () => void
+  onDragEnd: () => void
+  onDropBefore: () => void
   onRemove: () => void
   onAddAudio: () => void
   onAudioSettings: () => void
   onRemoveAudio: () => void
+  onAddFollowUp: () => void
+  onRemoveFollowUp: (fid: string) => void
 }) {
   const [open, setOpen] = useState(false)
   return (
-    <article className="rounded-xl border border-border bg-card p-4 transition hover:border-brand/40 sm:p-5">
+    <article
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={onDropBefore}
+      className={cn(
+        "rounded-xl border border-border bg-card p-4 transition hover:border-brand/40 sm:p-5",
+        dragging && "opacity-40",
+      )}
+    >
       <div className="flex items-start gap-3">
-        {/* 排序手柄 */}
-        <div className="flex flex-col items-center gap-0.5 pt-0.5">
-          <button
-            onClick={onMoveUp}
-            disabled={isFirst}
-            aria-label="上移"
-            className="rounded p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-30"
-          >
-            <ArrowUp className="size-3.5" />
-          </button>
+        {/* 拖拽手柄 + 序号 */}
+        <div
+          draggable
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          className="flex cursor-grab flex-col items-center gap-0.5 pt-0.5 active:cursor-grabbing"
+          title="拖拽调整顺序"
+        >
+          <GripVertical className="size-4 text-muted-foreground/60" />
           <span className="text-xs font-semibold text-muted-foreground tabular-nums">{index}</span>
-          <button
-            onClick={onMoveDown}
-            disabled={isLast}
-            aria-label="下移"
-            className="rounded p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-30"
-          >
-            <ArrowDown className="size-3.5" />
-          </button>
         </div>
 
         <div className="min-w-0 flex-1">
@@ -449,6 +543,30 @@ function ComposerQuestionCard({
             </div>
           )}
 
+          {/* 跟进练习 */}
+          {followUps.length > 0 && (
+            <div className="mt-3 space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+              <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <CornerDownRight className="size-3.5" />
+                跟进练习 · {followUps.length} 题
+              </p>
+              {followUps.map((f, i) => (
+                <div key={f.id} className="flex items-center gap-2 rounded-md bg-card px-2.5 py-2">
+                  <span className="text-xs font-medium text-brand">跟进{i + 1}</span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{f.short}</span>
+                  <span className="shrink-0 rounded bg-brand-soft px-1.5 py-0.5 text-[11px] text-brand-soft-foreground">{f.qType}</span>
+                  <button
+                    onClick={() => onRemoveFollowUp(f.id)}
+                    aria-label="移除跟进练习"
+                    className="shrink-0 rounded p-0.5 text-muted-foreground transition hover:text-destructive"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* 虚线分隔 */}
           <div className="my-3 border-t border-dashed border-border" />
 
@@ -478,6 +596,13 @@ function ComposerQuestionCard({
                 添加题目音频
               </button>
             )}
+            <button
+              onClick={onAddFollowUp}
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-brand/40 hover:text-foreground"
+            >
+              <ListPlus className="size-3.5" />
+              添加跟进练习
+            </button>
             <button
               onClick={onRemove}
               className="ml-auto inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
@@ -544,7 +669,7 @@ function RailButton({
   )
 }
 
-/* ---------------------------- 作业信息面板 ---------------------------- */
+/* ---------------------------- 作业信息面板（无练习说明） ---------------------------- */
 
 const ALL_CLASSES = ["七(1)班", "七(2)班", "七(3)班", "七(4)班", "八(1)班", "八(2)班"]
 const ANSWER_MODES = ["在线作答", "点阵笔纸质", "打印下发"]
@@ -558,8 +683,6 @@ function InfoPanel({
   setDue,
   answerMode,
   setAnswerMode,
-  note,
-  setNote,
 }: {
   name: string
   setName: (v: string) => void
@@ -569,8 +692,6 @@ function InfoPanel({
   setDue: (v: string) => void
   answerMode: string
   setAnswerMode: (v: string) => void
-  note: string
-  setNote: (v: string) => void
 }) {
   const toggleClass = (c: string) =>
     setClasses(classes.includes(c) ? classes.filter((x) => x !== c) : [...classes, c])
@@ -642,15 +763,6 @@ function InfoPanel({
           ))}
         </div>
       </Field>
-      <Field label="练习说明（选填）">
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={3}
-          placeholder="给学生的提示，如作答要求、时间建议等"
-          className="w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-brand focus:ring-2 focus:ring-brand/20"
-        />
-      </Field>
     </div>
   )
 }
@@ -658,26 +770,43 @@ function InfoPanel({
 /* ---------------------------- 分值设置面板 ---------------------------- */
 
 function ScorePanel({
-  validTypeSeq,
-  groupedIds,
-  itemMap,
-  typeScore,
-  setTypeScore,
+  sections,
+  lookup,
   overrides,
   setOverrides,
   scoreOf,
   total,
+  allIds,
 }: {
-  validTypeSeq: QType[]
-  groupedIds: (t: QType) => string[]
-  itemMap: Record<string, Question>
-  typeScore: Record<string, number>
-  setTypeScore: (fn: (p: Record<string, number>) => Record<string, number>) => void
+  sections: Section[]
+  lookup: (id: string) => Question | undefined
   overrides: Record<string, number>
   setOverrides: (fn: (p: Record<string, number>) => Record<string, number>) => void
   scoreOf: (q: Question) => number
   total: number
+  allIds: string[]
 }) {
+  const [perQuestion, setPerQuestion] = useState(5)
+  const [perSub, setPerSub] = useState(2)
+
+  /* 按题自动赋分：每题统一分值 */
+  const applyPerQuestion = () =>
+    setOverrides(() => {
+      const n: Record<string, number> = {}
+      allIds.forEach((id) => (n[id] = perQuestion))
+      return n
+    })
+  /* 按问自动赋分：每题 = 问数 × 每问分值 */
+  const applyPerSub = () =>
+    setOverrides(() => {
+      const n: Record<string, number> = {}
+      allIds.forEach((id) => {
+        const q = lookup(id)
+        if (q) n[id] = subCountOf(q) * perSub
+      })
+      return n
+    })
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between rounded-lg bg-brand-soft/60 px-3 py-2.5">
@@ -685,36 +814,71 @@ function ScorePanel({
         <span className="text-lg font-bold text-brand-soft-foreground">{total} 分</span>
       </div>
 
-      {validTypeSeq.map((t) => {
-        const ids = groupedIds(t)
+      {/* 自动赋分 */}
+      <div className="rounded-lg border border-border p-3">
+        <p className="mb-2.5 flex items-center gap-1 text-[13px] font-semibold text-foreground">
+          <Sparkles className="size-3.5 text-brand" />
+          自动赋分
+        </p>
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-center gap-2">
+            <span className="w-20 shrink-0 text-[13px] text-muted-foreground">按题赋分</span>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">每题</span>
+              <input
+                type="number"
+                min={0}
+                value={perQuestion}
+                onChange={(e) => setPerQuestion(Number(e.target.value) || 0)}
+                className="w-14 rounded-md border border-border bg-card px-2 py-1 text-center text-sm outline-none focus:border-brand"
+              />
+              <span className="text-xs text-muted-foreground">分</span>
+            </div>
+            <button
+              onClick={applyPerQuestion}
+              className="ml-auto rounded-md bg-brand-soft px-2.5 py-1 text-xs font-medium text-brand-soft-foreground transition hover:bg-brand hover:text-brand-foreground"
+            >
+              应用
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-20 shrink-0 text-[13px] text-muted-foreground">按问赋分</span>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">每问</span>
+              <input
+                type="number"
+                min={0}
+                value={perSub}
+                onChange={(e) => setPerSub(Number(e.target.value) || 0)}
+                className="w-14 rounded-md border border-border bg-card px-2 py-1 text-center text-sm outline-none focus:border-brand"
+              />
+              <span className="text-xs text-muted-foreground">分</span>
+            </div>
+            <button
+              onClick={applyPerSub}
+              className="ml-auto rounded-md bg-brand-soft px-2.5 py-1 text-xs font-medium text-brand-soft-foreground transition hover:bg-brand hover:text-brand-foreground"
+            >
+              应用
+            </button>
+          </div>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            按问赋分依据每题“问数”自动计算（主观 3 问、填空 2 问、其余 1 问），可在下方逐题微调。
+          </p>
+        </div>
+      </div>
+
+      {/* 逐题微调 */}
+      {sections.map((sec, si) => {
+        if (sec.questionIds.length === 0) return null
         return (
-          <div key={t} className="rounded-lg border border-border">
-            <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
-              <span className="text-[13px] font-semibold text-foreground">{TYPE_LABEL[t]}</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">每题</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={typeScore[t]}
-                  onChange={(e) => {
-                    const v = Number(e.target.value) || 0
-                    setTypeScore((p) => ({ ...p, [t]: v }))
-                    /* 批量应用：清除该题型单题覆盖 */
-                    setOverrides((p) => {
-                      const n = { ...p }
-                      ids.forEach((id) => delete n[id])
-                      return n
-                    })
-                  }}
-                  className="w-14 rounded-md border border-border bg-card px-2 py-1 text-center text-sm outline-none focus:border-brand"
-                />
-                <span className="text-xs text-muted-foreground">分</span>
-              </div>
+          <div key={sec.id} className="rounded-lg border border-border">
+            <div className="border-b border-border bg-muted/40 px-3 py-2 text-[13px] font-semibold text-foreground">
+              {CN_NUM[si]}、{sec.title}
             </div>
             <div className="divide-y divide-border">
-              {ids.map((id, i) => {
-                const q = itemMap[id]
+              {sec.questionIds.map((id, i) => {
+                const q = lookup(id)
+                if (!q) return null
                 return (
                   <div key={id} className="flex items-center gap-2 px-3 py-2">
                     <span className="w-5 shrink-0 text-xs font-medium text-muted-foreground">{i + 1}.</span>
@@ -739,83 +903,272 @@ function ScorePanel({
   )
 }
 
-/* ---------------------------- 题型及排序面板 ---------------------------- */
+/* ---------------------------- 题型及排序面板（拖拽 + 自定义大题） ---------------------------- */
 
 function OrderPanel({
-  validTypeSeq,
-  groupedIds,
-  itemMap,
-  moveType,
+  sections,
+  lookup,
+  drag,
+  setDrag,
+  reorderSections,
   moveQuestion,
+  renameSection,
+  deleteSection,
+  toggleCollapse,
+  addSection,
 }: {
-  validTypeSeq: QType[]
-  groupedIds: (t: QType) => string[]
-  itemMap: Record<string, Question>
-  moveType: (t: QType, dir: -1 | 1) => void
-  moveQuestion: (id: string, dir: -1 | 1) => void
+  sections: Section[]
+  lookup: (id: string) => Question | undefined
+  drag: DragState
+  setDrag: (d: DragState) => void
+  reorderSections: (fromId: string, toId: string) => void
+  moveQuestion: (qId: string, targetSecId: string, targetQId: string | null) => void
+  renameSection: (id: string, title: string) => void
+  deleteSection: (id: string) => void
+  toggleCollapse: (id: string) => void
+  addSection: () => void
 }) {
+  const [editing, setEditing] = useState<string | null>(null)
+
   return (
     <div className="flex flex-col gap-3">
       <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-        调整大题（题型）顺序，或大题内小题顺序，练习正文实时同步。
+        拖拽 <GripVertical className="inline size-3" /> 调整大题或小题顺序；可重命名、收起、删除（仅限空大题），或新增自定义大题。
       </p>
-      {validTypeSeq.map((t, ti) => {
-        const ids = groupedIds(t)
-        return (
-          <div key={t} className="rounded-lg border border-border">
-            <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
-              <span className="text-[13px] font-semibold text-foreground">
-                {CN_NUM[ti]}、{TYPE_LABEL[t]}
-                <span className="ml-1 text-xs font-normal text-muted-foreground">{ids.length} 题</span>
-              </span>
-              <div className="flex items-center gap-0.5">
-                <button
-                  onClick={() => moveType(t, -1)}
-                  disabled={ti === 0}
-                  aria-label="大题上移"
-                  className="rounded p-1 text-muted-foreground transition hover:bg-card hover:text-foreground disabled:opacity-30"
-                >
-                  <ArrowUp className="size-4" />
-                </button>
-                <button
-                  onClick={() => moveType(t, 1)}
-                  disabled={ti === validTypeSeq.length - 1}
-                  aria-label="大题下移"
-                  className="rounded p-1 text-muted-foreground transition hover:bg-card hover:text-foreground disabled:opacity-30"
-                >
-                  <ArrowDown className="size-4" />
-                </button>
-              </div>
-            </div>
-            <div className="divide-y divide-border">
-              {ids.map((id, i) => (
-                <div key={id} className="flex items-center gap-2 px-3 py-2">
-                  <span className="w-5 shrink-0 text-xs font-medium text-muted-foreground">{i + 1}.</span>
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{itemMap[id].short}</span>
-                  <div className="flex shrink-0 items-center gap-0.5">
-                    <button
-                      onClick={() => moveQuestion(id, -1)}
-                      disabled={i === 0}
-                      aria-label="小题上移"
-                      className="rounded p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-30"
-                    >
-                      <ArrowUp className="size-3.5" />
-                    </button>
-                    <button
-                      onClick={() => moveQuestion(id, 1)}
-                      disabled={i === ids.length - 1}
-                      aria-label="小题下移"
-                      className="rounded p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-30"
-                    >
-                      <ArrowDown className="size-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+
+      {sections.map((sec, si) => (
+        <div
+          key={sec.id}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={() => {
+            if (drag?.kind === "sec" && drag.id !== sec.id) reorderSections(drag.id, sec.id)
+            else if (drag?.kind === "q") moveQuestion(drag.id, sec.id, null)
+            setDrag(null)
+          }}
+          className={cn(
+            "rounded-lg border border-border",
+            drag?.kind === "sec" && drag.id === sec.id && "opacity-40",
+          )}
+        >
+          {/* 大题头 */}
+          <div className="flex items-center gap-1.5 border-b border-border bg-muted/40 px-2.5 py-2">
+            <span
+              draggable
+              onDragStart={() => setDrag({ kind: "sec", id: sec.id })}
+              onDragEnd={() => setDrag(null)}
+              className="cursor-grab text-muted-foreground/60 active:cursor-grabbing"
+              title="拖拽调整大题顺序"
+            >
+              <GripVertical className="size-4" />
+            </span>
+            <button
+              onClick={() => toggleCollapse(sec.id)}
+              className="rounded p-0.5 text-muted-foreground transition hover:text-foreground"
+              aria-label={sec.collapsed ? "展开" : "收起"}
+            >
+              <ChevronDown className={cn("size-3.5 transition", sec.collapsed && "-rotate-90")} />
+            </button>
+            <span className="shrink-0 text-[13px] font-semibold text-foreground">{CN_NUM[si]}、</span>
+            {editing === sec.id ? (
+              <input
+                autoFocus
+                value={sec.title}
+                onChange={(e) => renameSection(sec.id, e.target.value)}
+                onBlur={() => setEditing(null)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) setEditing(null)
+                }}
+                className="min-w-0 flex-1 rounded border border-brand bg-card px-1.5 py-0.5 text-[13px] font-semibold text-foreground outline-none"
+              />
+            ) : (
+              <button
+                onClick={() => setEditing(sec.id)}
+                className="group flex min-w-0 flex-1 items-center gap-1 text-left text-[13px] font-semibold text-foreground"
+                title="点击重命名"
+              >
+                <span className="truncate">{sec.title}</span>
+                <Pencil className="size-3 shrink-0 text-muted-foreground/50 opacity-0 transition group-hover:opacity-100" />
+              </button>
+            )}
+            <span className="shrink-0 text-xs font-normal text-muted-foreground">{sec.questionIds.length} 题</span>
+            <button
+              onClick={() => deleteSection(sec.id)}
+              disabled={sec.questionIds.length > 0}
+              title={sec.questionIds.length > 0 ? "请先移出该大题下的题目" : "删除大题"}
+              className="rounded p-1 text-muted-foreground transition hover:bg-card hover:text-destructive disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-muted-foreground"
+              aria-label="删除大题"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
           </div>
-        )
-      })}
+
+          {/* 小题列表 */}
+          {!sec.collapsed && (
+            <div className="divide-y divide-border">
+              {sec.questionIds.length === 0 && (
+                <div className="px-3 py-3 text-center text-xs text-muted-foreground">拖拽题目到此大题</div>
+              )}
+              {sec.questionIds.map((id, i) => {
+                const q = lookup(id)
+                if (!q) return null
+                return (
+                  <div
+                    key={id}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.stopPropagation()
+                      if (drag?.kind === "q" && drag.id !== id) moveQuestion(drag.id, sec.id, id)
+                      setDrag(null)
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2",
+                      drag?.kind === "q" && drag.id === id && "opacity-40",
+                    )}
+                  >
+                    <span
+                      draggable
+                      onDragStart={(e) => {
+                        e.stopPropagation()
+                        setDrag({ kind: "q", id })
+                      }}
+                      onDragEnd={() => setDrag(null)}
+                      className="cursor-grab text-muted-foreground/60 active:cursor-grabbing"
+                      title="拖拽调整顺序"
+                    >
+                      <GripVertical className="size-3.5" />
+                    </span>
+                    <span className="w-4 shrink-0 text-xs font-medium text-muted-foreground">{i + 1}.</span>
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{q.short}</span>
+                    <span className="shrink-0 rounded bg-brand-soft px-1.5 py-0.5 text-[11px] text-brand-soft-foreground">{q.qType}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+
+      <button
+        onClick={addSection}
+        className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2.5 text-[13px] font-medium text-muted-foreground transition hover:border-brand hover:text-brand"
+      >
+        <Plus className="size-4" />
+        新增自定义大题
+      </button>
+    </div>
+  )
+}
+
+/* ---------------------------- 跟进练习选题弹窗 ---------------------------- */
+
+function QuestionPickerModal({
+  anchor,
+  exclude,
+  onClose,
+  onConfirm,
+}: {
+  anchor: Question
+  exclude: string[]
+  onClose: () => void
+  onConfirm: (ids: string[]) => void
+}) {
+  const [picked, setPicked] = useState<string[]>([])
+  const [kw, setKw] = useState("")
+
+  const candidates = bank.filter((q) => {
+    if (exclude.includes(q.id)) return false
+    if (kw && !q.short.includes(kw)) return false
+    return true
+  })
+  const toggle = (id: string) =>
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <button className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={onClose} aria-label="关闭" />
+      <div className="relative flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl border border-border bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="min-w-0">
+            <h3 className="flex items-center gap-2 text-base font-bold text-foreground">
+              <ListPlus className="size-4 text-brand" />
+              添加跟进练习
+            </h3>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">为「{anchor.short}」从题库选择巩固题</p>
+          </div>
+          <button onClick={onClose} className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground">
+            <X className="size-5" />
+          </button>
+        </div>
+
+        {/* 搜索 */}
+        <div className="border-b border-border px-5 py-3">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+            <Search className="size-4 text-muted-foreground" />
+            <input
+              value={kw}
+              onChange={(e) => setKw(e.target.value)}
+              placeholder="搜索题库题目…"
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+        </div>
+
+        {/* 候选题 */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+          <div className="flex flex-col gap-2">
+            {candidates.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">没有匹配的题目</p>
+            )}
+            {candidates.map((q) => {
+              const on = picked.includes(q.id)
+              return (
+                <button
+                  key={q.id}
+                  onClick={() => toggle(q.id)}
+                  className={cn(
+                    "flex items-start gap-3 rounded-xl border p-3 text-left transition",
+                    on ? "border-brand bg-brand-soft/40" : "border-border hover:border-brand/40",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "mt-0.5 grid size-4 shrink-0 place-items-center rounded border",
+                      on ? "border-brand bg-brand text-brand-foreground" : "border-muted-foreground/40",
+                    )}
+                  >
+                    {on && <Check className="size-3" strokeWidth={3} />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-foreground">{q.stem}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="rounded bg-brand-soft px-1.5 py-0.5 font-medium text-brand-soft-foreground">{q.qType}</span>
+                      <SourceBadge level={q.level} />
+                      <span className={cn("rounded px-1.5 py-0.5 font-medium", diffStyle[q.difficulty])}>{q.difficulty}</span>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* 底部 */}
+        <div className="flex items-center justify-between border-t border-border px-5 py-3">
+          <span className="text-sm text-muted-foreground">已选 <span className="font-semibold text-foreground">{picked.length}</span> 题</span>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted">
+              取消
+            </button>
+            <button
+              onClick={() => onConfirm(picked)}
+              disabled={picked.length === 0}
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90 disabled:opacity-50"
+            >
+              添加为跟进练习
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
