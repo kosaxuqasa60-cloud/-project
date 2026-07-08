@@ -1077,6 +1077,46 @@ export function ResourceWorkbench() {
     )
   }
 
+  /* 预览二级页：全屏接管，隐藏应用左侧导航与章节目录 */
+  if (previewPaper) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-background">
+        <PaperDetail
+          paper={previewPaper}
+          premium={isPremium}
+          selected={selected}
+          onToggle={toggle}
+          onBack={() => setPreviewPaper(null)}
+        />
+        {/* 预览页也保留题篮入口 */}
+        <button
+          onClick={() => setCartOpen(true)}
+          className="fixed bottom-8 right-6 z-30 flex flex-col items-center gap-0.5 rounded-2xl bg-brand px-3.5 py-3 text-brand-foreground shadow-lg shadow-brand/30 transition hover:opacity-95"
+        >
+          <ShoppingCart className="size-5" />
+          <span className="text-[11px] font-medium leading-none">题篮</span>
+          {selected.length > 0 && (
+            <span className="absolute -right-1.5 -top-1.5 grid min-w-5 place-items-center rounded-full border-2 border-background bg-hard px-1 text-[11px] font-bold text-white tabular-nums">
+              {selected.length}
+            </span>
+          )}
+        </button>
+        <CartDrawer
+          open={cartOpen}
+          items={cartItems}
+          onClose={() => setCartOpen(false)}
+          onRemove={(id) => toggle(id)}
+          onClear={() => setSelected([])}
+          onGenerate={() => {
+            setCartOpen(false)
+            setPreviewPaper(null)
+            setComposing(true)
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="relative flex h-full min-h-0">
       {/* 左侧目录栏 */}
@@ -1091,16 +1131,6 @@ export function ResourceWorkbench() {
 
       {/* 主区域 */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {previewPaper ? (
-          <PaperDetail
-            paper={previewPaper}
-            premium={isPremium}
-            selected={selected}
-            onToggle={toggle}
-            onBack={() => setPreviewPaper(null)}
-          />
-        ) : (
-          <>
         {/* 工具栏（无面包屑） */}
         <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-border bg-background/85 px-5 py-3 backdrop-blur">
           <button
@@ -1174,13 +1204,15 @@ export function ResourceWorkbench() {
               onChange={(v) => setSource(v as typeof source)}
               renderItem={(it) => (it === "全部" ? "全部" : `${it}级`.replace("我级", "我的"))}
             />
-            <button
-              onClick={() => setMoreFilters((v) => !v)}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition hover:text-foreground"
-            >
-              更多筛选
-              <ChevronDown className={cn("size-3.5 transition", moreFilters && "rotate-180")} />
-            </button>
+            {resourceType !== "作业" && (
+              <button
+                onClick={() => setMoreFilters((v) => !v)}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition hover:text-foreground"
+              >
+                更多筛选
+                <ChevronDown className={cn("size-3.5 transition", moreFilters && "rotate-180")} />
+              </button>
+            )}
 
             <div className="ml-auto flex items-center gap-3">
               <span className="text-xs text-muted-foreground">
@@ -1217,7 +1249,7 @@ export function ResourceWorkbench() {
             </div>
           </div>
 
-          {moreFilters && (
+          {moreFilters && resourceType !== "作业" && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-2.5">
               {isQuestion && (
                 <FilterGroup
@@ -1275,8 +1307,6 @@ export function ResourceWorkbench() {
             </div>
           )}
         </div>
-          </>
-        )}
       </div>
 
       {/* 右侧悬浮题篮球（组卷时隐藏，避免与操作栏重叠） */}
@@ -1310,7 +1340,7 @@ export function ResourceWorkbench() {
         }}
       />
 
-      {/* 教材切换弹窗 */}
+      {/* 教���切换弹窗 */}
       <TextbookSwitcher open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
     </div>
   )
