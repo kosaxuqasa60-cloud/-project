@@ -30,7 +30,13 @@ import {
   Calendar,
   User,
   FolderTree,
+  Download,
+  Upload,
+  Presentation,
+  FileType2,
+  Play,
 } from "lucide-react"
+import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { ChapterSidebar } from "@/components/chapter-sidebar"
 import { SourceBadge, type Level } from "@/components/source-badge"
@@ -272,6 +278,8 @@ export const questions: Question[] = [
 
 /* 其他资源类型数据 */
 type ResSource = "组卷" | "上传" | "共享"
+type FileKind = "PPT" | "Word" | "PDF" | "Excel"
+type MicroCategory = "同步讲解" | "专题突破" | "复习巩固" | "考点精析" | "其他"
 type ResItem = {
   id: string
   title: string
@@ -288,6 +296,17 @@ type ResItem = {
   chapter?: string
   creator?: string
   createdAt?: string
+  /* 备课 / 微课 通用展示字段 */
+  author?: string
+  uploadedAt?: string
+  previewCount?: number
+  useCount?: number
+  pages?: number
+  fileKind?: FileKind
+  /* 微课字段 */
+  cover?: string
+  duration?: string
+  category?: MicroCategory
 }
 
 const homeworkData: ResItem[] = [
@@ -336,27 +355,45 @@ const homeworkData: ResItem[] = [
 const lessonData: ResItem[] = [
   {
     id: "lp1",
-    title: "15.2 一元一次不等式组（第1课时）",
+    title: "15.2 一元一次不等式组（第1课时）.pptx",
     level: "校",
-    meta: ["PPT 课件", "24 页", "使用 56 次"],
-    tags: ["新授课", "数轴表示", "配套学案"],
-    action: "用于备课",
+    meta: [],
+    tags: [],
+    action: "",
+    fileKind: "PPT",
+    author: "张伟",
+    uploadedAt: "2026-06-28",
+    previewCount: 0,
+    useCount: 2,
+    pages: 24,
   },
   {
     id: "lp2",
-    title: "一元一次不等式组解集规律 · 教学设计",
+    title: "一元一次不等式组解集规律 · 教学设计.docx",
     level: "区",
-    meta: ["教案 / 讲义", "8 页", "使用 132 次"],
-    tags: ["规律梳理", "公开课"],
-    action: "用于备课",
+    meta: [],
+    tags: [],
+    action: "",
+    fileKind: "Word",
+    author: "李娜",
+    uploadedAt: "2026-07-02",
+    previewCount: 18,
+    useCount: 6,
+    pages: 8,
   },
   {
     id: "lp3",
-    title: "第15章 单元整体教学设计",
+    title: "第15章 单元整体教学设计.pdf",
     level: "市",
-    meta: ["教案 + PPT", "42 页", "使用 410 次"],
-    tags: ["大单元", "教学评一体化"],
-    action: "用于备课",
+    meta: [],
+    tags: [],
+    action: "",
+    fileKind: "PDF",
+    author: "教研组",
+    uploadedAt: "2026-05-19",
+    previewCount: 132,
+    useCount: 41,
+    pages: 42,
   },
 ]
 
@@ -365,28 +402,49 @@ const microData: ResItem[] = [
     id: "mc1",
     title: "一元一次不等式的解法",
     level: "市",
-    meta: ["时长 06:12", "观看 2.3k"],
-    tags: ["精讲", "解法演示"],
-    action: "预览微课",
+    meta: [],
+    tags: [],
+    action: "",
     hasVideo: true,
+    cover: "/micro/cover-1.png",
+    duration: "06:12",
+    category: "同步讲解",
+    author: "张伟",
+    uploadedAt: "2026-06-20",
+    previewCount: 0,
+    useCount: 12,
   },
   {
     id: "mc2",
     title: "数轴上表示不等式组的解集",
     level: "区",
-    meta: ["时长 08:30", "观看 1.1k"],
-    tags: ["数轴表示", "易错点"],
-    action: "预览微课",
+    meta: [],
+    tags: [],
+    action: "",
     hasVideo: true,
+    cover: "/micro/cover-2.png",
+    duration: "08:30",
+    category: "专题突破",
+    author: "李娜",
+    uploadedAt: "2026-06-24",
+    previewCount: 8,
+    useCount: 5,
   },
   {
     id: "mc3",
     title: "不等式性质常见陷阱",
     level: "校",
-    meta: ["时长 05:48", "观看 640"],
-    tags: ["概念辨析", "纠错"],
-    action: "预览微课",
+    meta: [],
+    tags: [],
+    action: "",
     hasVideo: true,
+    cover: "/micro/cover-3.png",
+    duration: "05:48",
+    category: "考点精析",
+    author: "王芳",
+    uploadedAt: "2026-06-30",
+    previewCount: 3,
+    useCount: 2,
   },
 ]
 
@@ -772,6 +830,155 @@ function HomeworkCard({ item, onPreview }: { item: ResItem; onPreview: () => voi
   )
 }
 
+/* ---------------------------- 备课 / 微课 通用 ---------------------------- */
+
+const fileKindStyle: Record<FileKind, { bg: string; label: string; icon: typeof FileText }> = {
+  PPT: { bg: "bg-[oklch(0.62_0.16_38)]", label: "PPT", icon: Presentation },
+  Word: { bg: "bg-[oklch(0.5_0.13_255)]", label: "DOC", icon: FileText },
+  PDF: { bg: "bg-[oklch(0.55_0.18_25)]", label: "PDF", icon: FileType2 },
+  Excel: { bg: "bg-[oklch(0.52_0.13_150)]", label: "XLS", icon: FileText },
+}
+
+const microCatStyle: Record<MicroCategory, string> = {
+  同步讲解: "bg-brand-soft text-brand-soft-foreground",
+  专题突破: "bg-accent text-accent-foreground",
+  复习巩固: "bg-warn/20 text-warn-foreground",
+  考点精析: "bg-[oklch(0.93_0.03_255)] text-[oklch(0.4_0.13_255)]",
+  其他: "bg-muted text-muted-foreground",
+}
+
+/* 共用操作：预览 / 编辑 / 下载 / 共享 / 删除 */
+function ResourceActions({ onPreview, compact }: { onPreview?: () => void; compact?: boolean }) {
+  const actions: { icon: typeof Eye; label: string; onClick?: () => void; danger?: boolean }[] = [
+    { icon: Eye, label: "预览", onClick: onPreview },
+    { icon: Pencil, label: "编辑" },
+    { icon: Download, label: "下载" },
+    { icon: Share2, label: "共享" },
+    { icon: Trash2, label: "删除", danger: true },
+  ]
+  return (
+    <div className={cn("flex items-center", compact ? "gap-1" : "gap-1.5")}>
+      {actions.map((a) => (
+        <button
+          key={a.label}
+          onClick={a.onClick}
+          title={a.label}
+          aria-label={a.label}
+          className={cn(
+            "inline-flex items-center justify-center rounded-lg border border-border transition hover:border-brand/40 hover:text-foreground",
+            compact ? "size-8" : "gap-1 px-2.5 py-1.5 text-xs font-medium",
+            a.danger ? "text-muted-foreground hover:border-destructive/40 hover:text-destructive" : "text-muted-foreground",
+          )}
+        >
+          <a.icon className="size-3.5" />
+          {!compact && a.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/* 备课：文件列表行 */
+function PrepCard({ item, onPreview }: { item: ResItem; onPreview: () => void }) {
+  const fk = fileKindStyle[item.fileKind ?? "Word"]
+  return (
+    <article className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition hover:border-brand/40 hover:shadow-sm">
+      {/* 文件类型图标 */}
+      <div className={cn("grid size-12 shrink-0 place-items-center rounded-lg text-white", fk.bg)}>
+        <fk.icon className="size-6" />
+      </div>
+
+      {/* 主体信息 */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h3 className="truncate text-[15px] font-semibold text-foreground">{item.title}</h3>
+          <SourceBadge level={item.level} showLabel />
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <User className="size-3.5 text-muted-foreground/70" />
+            {item.author}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Calendar className="size-3.5 text-muted-foreground/70" />
+            {item.uploadedAt}
+          </span>
+          <span>预览次数：<span className="font-medium text-foreground">{item.previewCount}</span></span>
+          <span>使用次数：<span className="font-medium text-foreground">{item.useCount}</span></span>
+          <span>共 <span className="font-medium text-foreground">{item.pages}</span> 页</span>
+        </div>
+      </div>
+
+      {/* 操作 */}
+      <div className="shrink-0">
+        <ResourceActions onPreview={onPreview} compact />
+      </div>
+    </article>
+  )
+}
+
+/* 微课：封面卡片 */
+function MicroCard({ item, onPreview }: { item: ResItem; onPreview: () => void }) {
+  return (
+    <article className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition hover:border-brand/40 hover:shadow-sm">
+      {/* 封面 */}
+      <button onClick={onPreview} className="relative aspect-video w-full overflow-hidden bg-muted">
+        {item.cover && (
+          <Image
+            src={item.cover || "/placeholder.svg"}
+            alt={item.title}
+            fill
+            className="object-cover transition group-hover:scale-105"
+            sizes="(max-width: 768px) 100vw, 33vw"
+          />
+        )}
+        {/* 播放遮罩 */}
+        <span className="absolute inset-0 grid place-items-center bg-foreground/0 transition group-hover:bg-foreground/20">
+          <span className="grid size-11 place-items-center rounded-full bg-card/90 text-brand opacity-0 shadow-lg transition group-hover:opacity-100">
+            <Play className="size-5 translate-x-0.5 fill-current" />
+          </span>
+        </span>
+        {/* 分类 + 级别 */}
+        <span className="absolute left-2 top-2 flex items-center gap-1.5">
+          {item.category && (
+            <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-medium", microCatStyle[item.category])}>
+              {item.category}
+            </span>
+          )}
+        </span>
+        <span className="absolute right-2 top-2">
+          <SourceBadge level={item.level} />
+        </span>
+        {/* 时长 */}
+        {item.duration && (
+          <span className="absolute bottom-2 right-2 rounded bg-foreground/75 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-background">
+            {item.duration}
+          </span>
+        )}
+      </button>
+
+      {/* 信息 */}
+      <div className="flex flex-1 flex-col p-3">
+        <h3 className="line-clamp-2 text-[14px] font-semibold leading-snug text-foreground">{item.title}</h3>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <User className="size-3 text-muted-foreground/70" />
+            {item.author}
+          </span>
+          <span>{item.uploadedAt}</span>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-muted-foreground">
+          <span>预览：<span className="font-medium text-foreground">{item.previewCount}</span></span>
+          <span>使用：<span className="font-medium text-foreground">{item.useCount}</span></span>
+        </div>
+        <div className="mt-3 border-t border-dashed border-border pt-2.5">
+          <ResourceActions onPreview={onPreview} compact />
+        </div>
+      </div>
+    </article>
+  )
+}
+
 /* ---------------------------- 其他资源卡 ---------------------------- */
 
 function ResourceCard({
@@ -1036,6 +1243,7 @@ export function ResourceWorkbench() {
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [previewPaper, setPreviewPaper] = useState<ResItem | null>(null)
   const [composing, setComposing] = useState(false)
+  const [uploadKind, setUploadKind] = useState<"备课" | "微课" | null>(null)
 
   const toggle = (id: string) =>
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
@@ -1177,13 +1385,33 @@ export function ResourceWorkbench() {
             />
           </div>
 
-          <Link
-            href="/new-question"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
-          >
-            <Plus className="size-4" />
-            新增题目
-          </Link>
+          {resourceType === "题目" && (
+            <Link
+              href="/new-question"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+            >
+              <Plus className="size-4" />
+              新增题目
+            </Link>
+          )}
+          {resourceType === "备课" && (
+            <button
+              onClick={() => setUploadKind("备课")}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+            >
+              <Upload className="size-4" />
+              上传文件
+            </button>
+          )}
+          {resourceType === "微课" && (
+            <button
+              onClick={() => setUploadKind("微课")}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+            >
+              <Upload className="size-4" />
+              上传微课
+            </button>
+          )}
         </div>
 
         {/* 精品资源：B 端可见性提示 */}
@@ -1289,21 +1517,31 @@ export function ResourceWorkbench() {
                 </div>
               )}
             </div>
+          ) : resourceType === "微课" ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {otherData.map((item) => (
+                <MicroCard key={item.id} item={item} onPreview={() => {}} />
+              ))}
+            </div>
           ) : (
             <div className="flex flex-col gap-3">
               {resourceType === "作业"
                 ? otherData.map((item) => (
                     <HomeworkCard key={item.id} item={item} onPreview={() => setPreviewPaper(item)} />
                   ))
-                : otherData.map((item) => (
-                    <ResourceCard
-                      key={item.id}
-                      item={item}
-                      premium={isPremium}
-                      canPreview={isPremium}
-                      onPreview={() => setPreviewPaper(item)}
-                    />
-                  ))}
+                : resourceType === "备课"
+                  ? otherData.map((item) => (
+                      <PrepCard key={item.id} item={item} onPreview={() => {}} />
+                    ))
+                  : otherData.map((item) => (
+                      <ResourceCard
+                        key={item.id}
+                        item={item}
+                        premium={isPremium}
+                        canPreview={isPremium}
+                        onPreview={() => setPreviewPaper(item)}
+                      />
+                    ))}
             </div>
           )}
         </div>
@@ -1342,7 +1580,198 @@ export function ResourceWorkbench() {
 
       {/* 教���切换弹窗 */}
       <TextbookSwitcher open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
+
+      {/* 上传弹窗（备课文件 / 微课） */}
+      {uploadKind && <UploadModal kind={uploadKind} onClose={() => setUploadKind(null)} />}
     </div>
+  )
+}
+
+/* ---------------------------- 上传弹窗 ---------------------------- */
+
+const microCategories: MicroCategory[] = ["同步讲解", "专题突破", "复习巩固", "考点精析", "其他"]
+const levelOptions: Level[] = ["市", "区", "校", "我"]
+
+function UploadModal({ kind, onClose }: { kind: "备课" | "微课"; onClose: () => void }) {
+  const isMicro = kind === "微课"
+  const [fileName, setFileName] = useState("")
+  const [name, setName] = useState("")
+  const [desc, setDesc] = useState("")
+  const [cat, setCat] = useState<MicroCategory>("同步讲解")
+  const [level, setLevel] = useState<Level>("校")
+  const [coverName, setCoverName] = useState("")
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal>
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card shadow-xl">
+        {/* 头 */}
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+          <h3 className="text-base font-bold text-foreground">{isMicro ? "上传微课" : "上传文件"}</h3>
+          <button
+            onClick={onClose}
+            aria-label="关闭"
+            className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* 表单 */}
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+          {/* 上传文件 */}
+          <Field label="上传文件" required>
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 px-4 py-6 text-center transition hover:border-brand/50 hover:bg-brand-soft/40">
+              <Upload className="size-6 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                {fileName ? (
+                  <span className="font-medium text-foreground">{fileName}</span>
+                ) : (
+                  <>
+                    点击选择或拖拽文件到此处
+                    <br />
+                    <span className="text-xs">
+                      {isMicro ? "支持 MP4 / MOV，单个不超过 500MB" : "支持 PPT / Word / PDF / Excel"}
+                    </span>
+                  </>
+                )}
+              </span>
+              <input
+                type="file"
+                className="hidden"
+                onChange={(e) => setFileName(e.target.files?.[0]?.name ?? "")}
+              />
+            </label>
+          </Field>
+
+          {isMicro && (
+            <>
+              {/* 微课名称 */}
+              <Field label="微课名称" required>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="请输入微课名称"
+                  className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-brand focus:ring-2 focus:ring-brand/20"
+                />
+              </Field>
+
+              {/* 封面 */}
+              <Field label="封面">
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-input bg-card px-3 py-2.5 transition hover:border-brand/50">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
+                    <Image_ />
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {coverName ? (
+                      <span className="font-medium text-foreground">{coverName}</span>
+                    ) : (
+                      "上传封面图（建议 16:9），不上传则自动截取视频首帧"
+                    )}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => setCoverName(e.target.files?.[0]?.name ?? "")}
+                  />
+                </label>
+              </Field>
+
+              {/* 微课分类 */}
+              <Field label="微课分类" required>
+                <div className="flex flex-wrap gap-2">
+                  {microCategories.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setCat(c)}
+                      className={cn(
+                        "rounded-lg border px-3 py-1.5 text-sm font-medium transition",
+                        cat === c
+                          ? "border-brand bg-brand-soft text-brand-soft-foreground"
+                          : "border-border text-muted-foreground hover:border-brand/40 hover:text-foreground",
+                      )}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
+              {/* 描述 */}
+              <Field label="描述">
+                <textarea
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                  rows={3}
+                  placeholder="简要描述微课内容、适用场景等"
+                  className="w-full resize-none rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-brand focus:ring-2 focus:ring-brand/20"
+                />
+              </Field>
+            </>
+          )}
+
+          {/* 级别 */}
+          <Field label="级别">
+            <div className="flex flex-wrap gap-2">
+              {levelOptions.map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLevel(l)}
+                  className={cn(
+                    "rounded-lg border px-3 py-1.5 text-sm font-medium transition",
+                    level === l
+                      ? "border-brand bg-brand-soft text-brand-soft-foreground"
+                      : "border-border text-muted-foreground hover:border-brand/40 hover:text-foreground",
+                  )}
+                >
+                  {l === "我" ? "我的" : `${l}级`}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+
+        {/* 底部 */}
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-border px-5 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            取消
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-brand px-5 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+          >
+            确认上传
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-foreground">
+        {label}
+        {required && <span className="ml-0.5 text-destructive">*</span>}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+/* 小图标：避免与 next/image 的 Image 命名冲突 */
+function Image_() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </svg>
   )
 }
 
