@@ -27,6 +27,12 @@ import {
   ListPlus,
   CornerDownRight,
   ScanLine,
+  MonitorSmartphone,
+  CalendarClock,
+  Users,
+  CheckCircle2,
+  FileText,
+  ArrowRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SourceBadge } from "@/components/source-badge"
@@ -106,7 +112,10 @@ export function ExerciseComposer({
   /* 作业信息（无练习说明） */
   const [classes, setClasses] = useState<string[]>(["七(1)班", "七(2)班"])
   const [due, setDue] = useState("2026-07-14")
-  const [answerMode, setAnswerMode] = useState("点阵笔纸质")
+
+  /* 布置作业 & 框选 */
+  const [publishOpen, setPublishOpen] = useState(false)
+  const [paperSize, setPaperSize] = useState<"A4" | "B3">("A4")
 
   /* 题目音频 & 跟进练习 */
   const [audios, setAudios] = useState<Record<string, AudioInfo>>({})
@@ -210,7 +219,14 @@ export function ExerciseComposer({
   }))
 
   if (layoutOpen) {
-    return <DotPenLayout name={name} sections={resolvedSections} onBack={() => setLayoutOpen(false)} />
+    return (
+      <DotPenLayout
+        name={name}
+        sections={resolvedSections}
+        paper={paperSize}
+        onBack={() => setLayoutOpen(false)}
+      />
+    )
   }
 
   return (
@@ -224,10 +240,7 @@ export function ExerciseComposer({
           count={allIds.length}
           classes={classes}
           onBack={onBack}
-          answerMode={answerMode}
-          onPrimary={() => {
-            if (answerMode === "点阵笔纸质") setLayoutOpen(true)
-          }}
+          onPrimary={() => setPublishOpen(true)}
         />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
@@ -340,8 +353,6 @@ export function ExerciseComposer({
                 setClasses={setClasses}
                 due={due}
                 setDue={setDue}
-                answerMode={answerMode}
-                setAnswerMode={setAnswerMode}
               />
             )}
             {drawer === "score" && (
@@ -406,6 +417,22 @@ export function ExerciseComposer({
           }}
         />
       )}
+
+      {/* 布置作业 */}
+      {publishOpen && (
+        <PublishDialog
+          name={name}
+          count={allIds.length}
+          total={total}
+          defaultClasses={classes}
+          onClose={() => setPublishOpen(false)}
+          onGoFrame={(paper) => {
+            setPaperSize(paper)
+            setPublishOpen(false)
+            setLayoutOpen(true)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -419,7 +446,6 @@ function ComposerHeader({
   count,
   classes,
   onBack,
-  answerMode,
   onPrimary,
 }: {
   name: string
@@ -428,10 +454,8 @@ function ComposerHeader({
   count: number
   classes: string[]
   onBack: () => void
-  answerMode: string
-  onPrimary: () => void
+  onPrimary?: () => void
 }) {
-  const isDotPen = answerMode === "点阵笔纸质"
   return (
     <div className="sticky top-0 z-10 border-b border-border bg-background/85 px-5 py-3 backdrop-blur">
       <button
@@ -463,8 +487,8 @@ function ComposerHeader({
             onClick={onPrimary}
             className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
           >
-            {isDotPen ? <ScanLine className="size-4" /> : <ClipboardList className="size-4" />}
-            {isDotPen ? "下一步：排版与框选" : "保存并去布置"}
+            <ClipboardList className="size-4" />
+            布置作业
           </button>
         </div>
       </div>
@@ -710,7 +734,6 @@ function RailButton({
 /* ---------------------------- 作业信息面板（无练习说明） ---------------------------- */
 
 const ALL_CLASSES = ["七(1)班", "七(2)班", "七(3)班", "七(4)班", "八(1)班", "八(2)班"]
-const ANSWER_MODES = ["在线作答", "点阵笔纸质", "打印下发"]
 
 function InfoPanel({
   name,
@@ -719,8 +742,6 @@ function InfoPanel({
   setClasses,
   due,
   setDue,
-  answerMode,
-  setAnswerMode,
 }: {
   name: string
   setName: (v: string) => void
@@ -728,8 +749,6 @@ function InfoPanel({
   setClasses: (v: string[]) => void
   due: string
   setDue: (v: string) => void
-  answerMode: string
-  setAnswerMode: (v: string) => void
 }) {
   const toggleClass = (c: string) =>
     setClasses(classes.includes(c) ? classes.filter((x) => x !== c) : [...classes, c])
@@ -775,32 +794,9 @@ function InfoPanel({
           className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
         />
       </Field>
-      <Field label="作答方式">
-        <div className="flex flex-col gap-1.5">
-          {ANSWER_MODES.map((m) => (
-            <button
-              key={m}
-              onClick={() => setAnswerMode(m)}
-              className={cn(
-                "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition",
-                answerMode === m
-                  ? "border-brand bg-brand-soft/50 text-foreground"
-                  : "border-border text-muted-foreground hover:border-brand/40",
-              )}
-            >
-              <span
-                className={cn(
-                  "grid size-4 place-items-center rounded-full border",
-                  answerMode === m ? "border-brand" : "border-muted-foreground/40",
-                )}
-              >
-                {answerMode === m && <span className="size-2 rounded-full bg-brand" />}
-              </span>
-              {m}
-            </button>
-          ))}
-        </div>
-      </Field>
+      <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+        布置类型（点阵笔 / 电子作业）与纸张尺寸将在点击「布置作业」时选择。
+      </p>
     </div>
   )
 }
@@ -827,14 +823,14 @@ function ScorePanel({
   const [perQuestion, setPerQuestion] = useState(5)
   const [perSub, setPerSub] = useState(2)
 
-  /* 按题自动赋分：每题统一分值 */
+  /* ��题自动赋分：每题统一分值 */
   const applyPerQuestion = () =>
     setOverrides(() => {
       const n: Record<string, number> = {}
       allIds.forEach((id) => (n[id] = perQuestion))
       return n
     })
-  /* 按问自动赋分：每题 = 问数 × 每问分值 */
+  /* 按问���动赋分：每题 = 问数 × 每问分值 */
   const applyPerSub = () =>
     setOverrides(() => {
       const n: Record<string, number> = {}
@@ -1367,6 +1363,261 @@ function SegBtn({ on, onClick, children }: { on: boolean; onClick: () => void; c
       )}
     >
       {children}
+    </button>
+  )
+}
+
+/* ---------------------------- 布置作业 ---------------------------- */
+
+const PUBLISH_CLASSES = ["七(1)班", "七(2)班", "七(3)班", "七(4)班", "八(1)班", "八(2)班"]
+
+function PublishDialog({
+  name,
+  count,
+  total,
+  defaultClasses,
+  onClose,
+  onGoFrame,
+}: {
+  name: string
+  count: number
+  total: number
+  defaultClasses: string[]
+  onClose: () => void
+  onGoFrame: (paper: "A4" | "B3") => void
+}) {
+  const [type, setType] = useState<"点阵笔" | "电子作业">("点阵笔")
+  const [classes, setClasses] = useState<string[]>(defaultClasses)
+  const [timing, setTiming] = useState<"立即" | "指定">("立即")
+  const [at, setAt] = useState("2026-07-09T08:00")
+  const [paper, setPaper] = useState<"A4" | "B3">("A4")
+  const [done, setDone] = useState(false)
+
+  const toggleClass = (c: string) =>
+    setClasses((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]))
+
+  const canSubmit = classes.length > 0
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal>
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-card shadow-xl">
+        {/* 头 */}
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+          <h3 className="text-base font-bold text-foreground">{done ? "布置成功" : "布置作业"}</h3>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            aria-label="关闭"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {done ? (
+          /* —— 成功态 —— */
+          <div className="flex flex-col items-center gap-3 px-6 py-8 text-center">
+            <div className="grid size-14 place-items-center rounded-full bg-easy/15">
+              <CheckCircle2 className="size-8 text-easy" />
+            </div>
+            <p className="text-[15px] font-semibold text-foreground">
+              {type === "电子作业" ? "作业已布置给学生" : "点阵笔作业已创建"}
+            </p>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {type === "电子作业"
+                ? `已布置到 ${classes.length} 个班，学生可在线作答。`
+                : `已布置到 ${classes.length} 个班。还需框选题目与作答区，学生用点阵笔书写才能自动归位识别。`}
+            </p>
+            {type === "点阵笔" ? (
+              <div className="mt-3 flex w-full flex-col gap-2">
+                <button
+                  onClick={() => onGoFrame(paper)}
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+                >
+                  <ScanLine className="size-4" />
+                  去框选
+                  <ArrowRight className="size-4" />
+                </button>
+                <button
+                  onClick={onClose}
+                  className="w-full rounded-lg border border-border py-2.5 text-sm font-medium text-foreground transition hover:bg-muted"
+                >
+                  稍后再框选
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onClose}
+                className="mt-3 w-full rounded-lg bg-brand py-2.5 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+              >
+                完成
+              </button>
+            )}
+          </div>
+        ) : (
+          /* —— 表单态 —— */
+          <>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              {/* 概要 */}
+              <div className="mb-4 rounded-lg bg-muted/60 px-3 py-2.5">
+                <p className="truncate text-sm font-semibold text-foreground">{name}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">共 {count} 题 · 总分 {total} 分</p>
+              </div>
+
+              {/* 布置类型 */}
+              <Field label="布置类型">
+                <div className="grid grid-cols-2 gap-2">
+                  <TypeCard
+                    icon={ScanLine}
+                    title="点阵笔作业"
+                    desc="纸质作答 · 自动归位识别"
+                    on={type === "点阵笔"}
+                    onClick={() => setType("点阵笔")}
+                  />
+                  <TypeCard
+                    icon={MonitorSmartphone}
+                    title="电子作业"
+                    desc="在线作答 · 直接布置"
+                    on={type === "电子作业"}
+                    onClick={() => setType("电子作业")}
+                  />
+                </div>
+              </Field>
+
+              {/* 纸张类型（仅点阵笔） */}
+              {type === "点阵笔" && (
+                <div className="mt-4">
+                  <Field label="纸张类型（卷码纸尺寸）">
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["A4", "B3"] as const).map((p) => (
+                        <button
+                          key={p}
+                          onClick={() => setPaper(p)}
+                          className={cn(
+                            "flex items-center gap-2 rounded-lg border p-2.5 text-left transition",
+                            paper === p
+                              ? "border-brand bg-brand-soft text-brand-soft-foreground"
+                              : "border-border text-muted-foreground hover:border-brand/40",
+                          )}
+                        >
+                          <FileText className="size-4 shrink-0" />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold">{p}</span>
+                            <span className="block text-[10px] opacity-70">
+                              {p === "A4" ? "210 × 297mm" : "353 × 500mm"}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                </div>
+              )}
+
+              {/* 布置班级 */}
+              <div className="mt-4">
+                <Field label={`布置班级（已选 ${classes.length}）`}>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PUBLISH_CLASSES.map((c) => {
+                      const on = classes.includes(c)
+                      return (
+                        <button
+                          key={c}
+                          onClick={() => toggleClass(c)}
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[13px] transition",
+                            on
+                              ? "border-brand bg-brand-soft font-medium text-brand-soft-foreground"
+                              : "border-border text-muted-foreground hover:border-brand/40",
+                          )}
+                        >
+                          {on && <Check className="size-3" />}
+                          {c}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </Field>
+              </div>
+
+              {/* 布置时间 */}
+              <div className="mt-4">
+                <Field label="布置时间">
+                  <div className="mb-2 grid grid-cols-2 gap-2">
+                    <SegBtn on={timing === "立即"} onClick={() => setTiming("立即")}>
+                      立即布置
+                    </SegBtn>
+                    <SegBtn on={timing === "指定"} onClick={() => setTiming("指定")}>
+                      指定时间
+                    </SegBtn>
+                  </div>
+                  {timing === "指定" && (
+                    <input
+                      type="datetime-local"
+                      value={at}
+                      onChange={(e) => setAt(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                    />
+                  )}
+                </Field>
+              </div>
+            </div>
+
+            {/* 底 */}
+            <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                {timing === "立即" ? (
+                  <>
+                    <Users className="size-3.5" />
+                    立即布置到 {classes.length} 个班
+                  </>
+                ) : (
+                  <>
+                    <CalendarClock className="size-3.5" />
+                    {at.replace("T", " ")} 布置
+                  </>
+                )}
+              </span>
+              <button
+                disabled={!canSubmit}
+                onClick={() => setDone(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90 disabled:opacity-50"
+              >
+                <ClipboardList className="size-4" />
+                确认布置
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TypeCard({
+  icon: Icon,
+  title,
+  desc,
+  on,
+  onClick,
+}: {
+  icon: React.ElementType
+  title: string
+  desc: string
+  on: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex flex-col gap-1 rounded-lg border p-3 text-left transition",
+        on ? "border-brand bg-brand-soft/50" : "border-border hover:border-brand/40",
+      )}
+    >
+      <Icon className={cn("size-5", on ? "text-brand" : "text-muted-foreground")} />
+      <span className="text-sm font-semibold text-foreground">{title}</span>
+      <span className="text-[11px] leading-tight text-muted-foreground">{desc}</span>
     </button>
   )
 }

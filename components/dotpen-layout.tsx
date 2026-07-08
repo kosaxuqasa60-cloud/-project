@@ -3,11 +3,14 @@
 import { useMemo, useState } from "react"
 import {
   ChevronLeft,
-  ClipboardList,
-  FileText,
-  ScanLine,
-  SquareDashed,
+  ChevronDown,
+  Save,
+  Printer,
+  Download,
+  Send,
   Square,
+  SquareDashed,
+  StickyNote,
   CheckCircle2,
   AlertTriangle,
   XCircle,
@@ -15,8 +18,12 @@ import {
   Rows3,
   Settings2,
   X,
-  Layers,
   Sparkles,
+  Minus,
+  Plus,
+  Maximize2,
+  RotateCw,
+  ChevronRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SourceBadge } from "@/components/source-badge"
@@ -42,35 +49,36 @@ const UNIT: Record<QType, number> = {
 /* 纸张（卷码纸）规格 */
 type PaperSize = "A4" | "B3"
 const PAPER: Record<PaperSize, { label: string; ratio: string; cap: number; mm: string }> = {
-  A4: { label: "A4 卷码纸", ratio: "210 / 297", cap: 108, mm: "210 × 297 mm" },
-  B3: { label: "B3 卷码纸", ratio: "353 / 500", cap: 190, mm: "353 × 500 mm" },
+  A4: { label: "A4 卷码纸", ratio: "210 / 297", cap: 108, mm: "210 × 297mm" },
+  B3: { label: "B3 卷码纸", ratio: "353 / 500", cap: 190, mm: "353 × 500mm" },
 }
 
 export type LaidSection = { id: string; title: string; items: { q: Question; score: number }[] }
 
 type BoxState = Record<string, { q: boolean; a: boolean }>
-type Tool = "题目框" | "答案框"
+type Tool = "题目框" | "小题框" | "作答框"
 
 export function DotPenLayout({
   name,
   sections,
+  paper,
   onBack,
 }: {
   name: string
   sections: LaidSection[]
+  paper: PaperSize
   onBack: () => void
 }) {
-  const [paper, setPaper] = useState<PaperSize>("A4")
-  const [columns, setColumns] = useState<1 | 2>(1)
-  const [fontSize, setFontSize] = useState<"小" | "中" | "大">("中")
-  const [answerCard, setAnswerCard] = useState(true)
-  const [autoFrame, setAutoFrame] = useState(true)
-  const [tool, setTool] = useState<Tool>("答案框")
+  const [showAll, setShowAll] = useState(true)
+  const [tool, setTool] = useState<Tool | null>(null)
   const [tab, setTab] = useState<"byQ" | "byLevel">("byQ")
   const [selected, setSelected] = useState<string | null>(null)
   const [configFor, setConfigFor] = useState<string | null>(null)
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [batchOpen, setBatchOpen] = useState(false)
+  const [curPage, setCurPage] = useState(1)
+  const [zoom, setZoom] = useState(100)
+  const [rotate, setRotate] = useState(0)
 
   /* 展开题目序列 */
   const flat = useMemo(() => {
@@ -85,10 +93,10 @@ export function DotPenLayout({
     return arr
   }, [sections])
 
-  /* 框选状态：默认自动全框 */
+  /* 框选状态：AI 默认全框，首题留答案框待确认演示 */
   const [boxes, setBoxes] = useState<BoxState>(() => {
     const b: BoxState = {}
-    flat.forEach((f) => (b[f.q.id] = { q: true, a: true }))
+    flat.forEach((f, i) => (b[f.q.id] = { q: true, a: i !== 0 }))
     return b
   })
 
@@ -96,14 +104,14 @@ export function DotPenLayout({
     Object.fromEntries(flat.map((f) => [f.q.id, f.score])),
   )
 
-  const capacity = PAPER[paper].cap * columns
+  const capacity = PAPER[paper].cap
   /* 自动分页 */
   const pages = useMemo(() => {
     const result: typeof flat[] = []
     let cur: typeof flat = []
     let used = 0
     flat.forEach((f) => {
-      const h = UNIT[f.q.qType] + (f.q.qType === "主观" && answerCard ? 6 : 0)
+      const h = UNIT[f.q.qType]
       if (used + h > capacity && cur.length) {
         result.push(cur)
         cur = []
@@ -114,7 +122,7 @@ export function DotPenLayout({
     })
     if (cur.length) result.push(cur)
     return result
-  }, [flat, capacity, answerCard])
+  }, [flat, capacity])
 
   const statusOf = (id: string): "done" | "warn" | "none" => {
     const b = boxes[id]
@@ -123,12 +131,22 @@ export function DotPenLayout({
     return "none"
   }
 
-  const toggleAuto = (on: boolean) => {
-    setAutoFrame(on)
-    setBoxes((prev) => {
-      const next: BoxState = {}
-      flat.forEach((f) => (next[f.q.id] = on ? { q: true, a: true } : { q: false, a: false }))
-      return next
+  /* 右栏/卷面用的确认状态 */
+  const noteOf = (f: { q: Question }): { label: string; tone: "green" | "orange" | "red" } => {
+    const st = statusOf(f.q.id)
+    if (st === "none") return { label: "未框选", tone: "red" }
+    if (st === "warn") return { label: "待确认", tone: "orange" }
+    if (f.q.qType === "填空") return { label: "作答区偏小", tone: "orange" }
+    return { label: "正常", tone: "green" }
+  }
+
+  const pendingCount = flat.filter((f) => noteOf(f).tone !== "green").length
+
+  const aiFrame = () => {
+    setBoxes(() => {
+      const b: BoxState = {}
+      flat.forEach((f) => (b[f.q.id] = { q: true, a: true }))
+      return b
     })
   }
 
@@ -136,175 +154,217 @@ export function DotPenLayout({
     setBoxes((prev) => ({ ...prev, [id]: { ...prev[id], [kind]: !prev[id]?.[kind] } }))
   }
 
-  const doneCount = flat.filter((f) => statusOf(f.q.id) === "done").length
+  const clampPage = (p: number) => Math.max(1, Math.min(pages.length, p))
+  const pageItems = pages[clampPage(curPage) - 1] ?? []
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* 顶部：步骤条 + 保存 */}
-      <div className="sticky top-0 z-10 border-b border-border bg-background/85 px-5 py-3 backdrop-blur">
+      {/* 顶部工具条 */}
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-2.5">
         <button
           onClick={onBack}
-          className="mb-2 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+          className="grid size-8 place-items-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          aria-label="返回"
         >
-          <ChevronLeft className="size-4" />
-          返回练习编辑
+          <ChevronLeft className="size-5" />
         </button>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <ScanLine className="size-5 text-brand" />
-              <h1 className="truncate text-lg font-bold text-foreground">{name} · 排版与框选</h1>
-            </div>
-            <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-              <StepDot n={1} label="生成练习" done />
-              <span className="h-px w-6 bg-border" />
-              <StepDot n={2} label="排版与框选" active />
-              <span className="h-px w-6 bg-border" />
-              <StepDot n={3} label="布置" />
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span
-              className={cn(
-                "rounded-full px-2.5 py-1 text-xs font-medium",
-                doneCount === flat.length
-                  ? "bg-easy/15 text-easy"
-                  : "bg-warn/20 text-warn-foreground",
-              )}
-            >
-              已框选 {doneCount}/{flat.length}
-            </span>
-            <button className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90">
-              <ClipboardList className="size-4" />
-              保存并去布置
-            </button>
-          </div>
+        <h1 className="text-base font-bold text-foreground">确认题目与作答区</h1>
+
+        {/* 卷名下拉（示意） */}
+        <button className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-foreground transition hover:bg-muted">
+          <span className="max-w-[220px] truncate">{name}</span>
+          <ChevronDown className="size-4 text-muted-foreground" />
+        </button>
+
+        {/* 纸张 */}
+        <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
+          <span className="size-3 rounded-sm bg-[radial-gradient(oklch(0.6_0.02_250)_0.5px,transparent_0.5px)] [background-size:3px_3px] ring-1 ring-border" />
+          {paper} {PAPER[paper].mm}
+        </span>
+
+        {/* 识别状态 */}
+        <span className="inline-flex items-center gap-1.5 text-sm">
+          <span className={cn("size-2 rounded-full", pendingCount ? "bg-warn" : "bg-easy")} />
+          <span className="text-muted-foreground">
+            已识别 <span className="font-semibold text-foreground">{flat.length}</span> 题，
+          </span>
+          {pendingCount > 0 && (
+            <span className="font-semibold text-warn-foreground">{pendingCount} 处待确认</span>
+          )}
+        </span>
+
+        {/* 右侧操作 */}
+        <div className="ml-auto flex items-center gap-2">
+          <HeaderBtn icon={Save}>保存</HeaderBtn>
+          <HeaderBtn icon={Printer}>预览打印</HeaderBtn>
+          <HeaderBtn icon={Download}>下载PDF</HeaderBtn>
+          <button className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90">
+            <Send className="size-4" />
+            发布作业
+          </button>
         </div>
       </div>
 
       <div className="flex min-h-0 flex-1">
-        {/* 左栏：排版 + 框选工具 */}
-        <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r border-border bg-card p-4 lg:flex">
-          {/* 纸张类型 */}
-          <SideTitle icon={FileText}>卷码纸尺寸</SideTitle>
-          <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
-            选定尺寸后，系统在该尺寸下自动排版，套打到已铺码的卷码纸上。
-          </p>
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            {(Object.keys(PAPER) as PaperSize[]).map((p) => (
-              <button
-                key={p}
-                onClick={() => setPaper(p)}
-                className={cn(
-                  "flex flex-col items-center gap-1 rounded-lg border p-2.5 text-xs transition",
-                  paper === p
-                    ? "border-brand bg-brand-soft text-brand-soft-foreground"
-                    : "border-border text-muted-foreground hover:border-brand/40",
-                )}
-              >
-                <span
-                  className="w-7 rounded-sm border border-current opacity-70"
-                  style={{ aspectRatio: PAPER[p].ratio }}
-                />
-                <span className="font-semibold">{p}</span>
-                <span className="text-[10px] opacity-70">{PAPER[p].mm}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* 排版参数 */}
-          <SideTitle icon={Layers}>排版参数</SideTitle>
-          <div className="mb-4 flex flex-col gap-3">
-            <div>
-              <span className="mb-1 block text-[11px] text-muted-foreground">分栏</span>
-              <Segmented
-                value={String(columns)}
-                options={[
-                  { v: "1", l: "单栏" },
-                  { v: "2", l: "双栏" },
-                ]}
-                onChange={(v) => setColumns(v === "2" ? 2 : 1)}
-              />
-            </div>
-            <div>
-              <span className="mb-1 block text-[11px] text-muted-foreground">字号</span>
-              <Segmented
-                value={fontSize}
-                options={[
-                  { v: "小", l: "小" },
-                  { v: "中", l: "中" },
-                  { v: "大", l: "大" },
-                ]}
-                onChange={(v) => setFontSize(v as "小" | "中" | "大")}
-              />
-            </div>
-            <label className="flex items-center justify-between text-xs text-foreground">
-              客观题独立答题卡区
-              <Switch on={answerCard} onChange={setAnswerCard} />
-            </label>
-          </div>
-
-          {/* 框选 */}
-          <SideTitle icon={SquareDashed}>框选</SideTitle>
-          <label className="mb-2 flex items-center justify-between rounded-lg bg-muted/60 px-2.5 py-2 text-xs font-medium text-foreground">
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="size-3.5 text-brand" />
-              自动框选
-            </span>
-            <Switch on={autoFrame} onChange={toggleAuto} />
+        {/* 左栏：智能框选 + 手动框选 */}
+        <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-card p-4 lg:flex">
+          <h3 className="mb-2 text-xs font-bold text-foreground">智能框选</h3>
+          <button
+            onClick={aiFrame}
+            className="mb-3 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-brand bg-brand-soft/40 py-3 text-sm font-semibold text-brand transition hover:bg-brand-soft"
+          >
+            <Sparkles className="size-4" />
+            AI 一键框选
+          </button>
+          <label className="mb-5 flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-xs font-medium text-foreground">
+            显示全部框
+            <Switch on={showAll} onChange={setShowAll} />
           </label>
+
+          <h3 className="mb-2 text-xs font-bold text-foreground">手动框选</h3>
           <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
-            版面坐标已知，开启后自动生成全部框。关闭后可用下方工具在卷面点击题目区/作答区手动增删框。
+            选择工具后，在卷面点击对应区域即可增删框。
           </p>
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            {(["题目框", "答案框"] as Tool[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTool(t)}
-                disabled={autoFrame}
-                className={cn(
-                  "flex items-center justify-center gap-1 rounded-lg border py-2 text-xs font-medium transition disabled:opacity-40",
-                  tool === t
-                    ? "border-brand bg-brand-soft text-brand-soft-foreground"
-                    : "border-border text-muted-foreground hover:border-brand/40",
-                )}
-              >
-                {t === "题目框" ? <Square className="size-3.5" /> : <SquareDashed className="size-3.5" />}
-                {t}
-              </button>
-            ))}
+          <div className="mb-4 flex flex-col gap-2">
+            {(["题目框", "小题框", "作答框"] as Tool[]).map((t) => {
+              const on = tool === t
+              const Icon = t === "作答框" ? SquareDashed : t === "小题框" ? StickyNote : Square
+              return (
+                <button
+                  key={t}
+                  onClick={() => setTool(on ? null : t)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition",
+                    on
+                      ? "border-brand bg-brand-soft text-brand-soft-foreground"
+                      : "border-border text-muted-foreground hover:border-brand/40",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "grid size-5 place-items-center rounded border",
+                      on ? "border-brand" : "border-muted-foreground/40",
+                    )}
+                  >
+                    {on && <span className="size-2 rounded-[2px] bg-brand" />}
+                  </span>
+                  <Icon className="size-4" />
+                  {t}
+                </button>
+              )
+            })}
           </div>
+
           {/* 图例 */}
-          <div className="flex flex-col gap-1.5 rounded-lg border border-border p-2.5 text-[11px] text-muted-foreground">
-            <LegendRow className="border-sky-400 bg-sky-400/10" label="题目框（印刷题干区）" />
-            <LegendRow className="border-brand bg-brand/10" label="答案框（手写作答区）" />
-            <LegendRow className="border-destructive bg-destructive/10" label="未框选题目" />
+          <div className="mt-auto flex flex-col gap-1.5 rounded-lg border border-border p-2.5 text-[11px] text-muted-foreground">
+            <LegendRow className="border-sky-400 bg-sky-400/10" label="题目区（印刷题干）" />
+            <LegendRow className="border-brand bg-brand/10" label="作答区（手写作答）" />
+            <LegendRow className="border-destructive bg-destructive/10" label="未框选 / 待确认" />
           </div>
         </aside>
 
-        {/* 中间：卷面画布 */}
-        <div className="min-h-0 flex-1 overflow-y-auto bg-muted/40 px-6 py-6">
-          <div className="mx-auto flex max-w-3xl flex-col items-center gap-6">
-            {pages.map((pageItems, pi) => (
-              <PaperSheet
-                key={pi}
-                pageIndex={pi + 1}
-                pageCount={pages.length}
-                size={paper}
-                columns={columns}
-                fontSize={fontSize}
-                items={pageItems}
-                boxes={boxes}
-                selected={selected}
-                autoFrame={autoFrame}
-                tool={tool}
-                onSelect={(id) => {
-                  setSelected(id)
-                  setTab("byQ")
-                }}
-                onToggleBox={toggleBox}
-              />
-            ))}
+        {/* 中间：缩略图 + 缩放条 + 卷面 */}
+        <div className="flex min-h-0 flex-1 flex-col bg-muted/40">
+          {/* 缩放工具条 */}
+          <div className="flex shrink-0 items-center justify-center gap-1.5 border-b border-border bg-card/70 px-4 py-1.5 backdrop-blur">
+            <ToolIcon onClick={() => setCurPage((p) => clampPage(p - 1))} disabled={curPage <= 1}>
+              <ChevronLeft className="size-4" />
+            </ToolIcon>
+            <span className="inline-flex items-center gap-1 px-1 text-sm text-foreground">
+              <span className="min-w-5 rounded border border-border bg-card px-1.5 text-center font-semibold">
+                {clampPage(curPage)}
+              </span>
+              / {pages.length}页
+            </span>
+            <ToolIcon
+              onClick={() => setCurPage((p) => clampPage(p + 1))}
+              disabled={curPage >= pages.length}
+            >
+              <ChevronRight className="size-4" />
+            </ToolIcon>
+            <span className="mx-2 h-4 w-px bg-border" />
+            <ToolIcon onClick={() => setZoom((z) => Math.max(50, z - 10))}>
+              <Minus className="size-4" />
+            </ToolIcon>
+            <span className="min-w-12 text-center text-sm font-medium text-foreground">{zoom}%</span>
+            <ToolIcon onClick={() => setZoom((z) => Math.min(200, z + 10))}>
+              <Plus className="size-4" />
+            </ToolIcon>
+            <span className="mx-2 h-4 w-px bg-border" />
+            <ToolText onClick={() => setZoom(90)} icon={Maximize2}>
+              适宽
+            </ToolText>
+            <ToolText onClick={() => setZoom(100)} icon={Square}>
+              实际大小
+            </ToolText>
+            <ToolText onClick={() => setRotate((r) => (r + 90) % 360)} icon={RotateCw}>
+              旋转
+            </ToolText>
+          </div>
+
+          <div className="flex min-h-0 flex-1">
+            {/* 缩略图列 */}
+            <div className="hidden w-24 shrink-0 flex-col items-center gap-3 overflow-y-auto border-r border-border bg-card/50 py-4 sm:flex">
+              {pages.map((_, pi) => (
+                <button
+                  key={pi}
+                  onClick={() => setCurPage(pi + 1)}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <span
+                    className={cn(
+                      "w-14 rounded-sm bg-white shadow-sm ring-1 transition",
+                      clampPage(curPage) === pi + 1 ? "ring-2 ring-brand" : "ring-border",
+                    )}
+                    style={{ aspectRatio: PAPER[paper].ratio }}
+                  >
+                    <span className="flex h-full flex-col gap-1 p-1.5">
+                      <span className="h-1 w-2/3 rounded-full bg-muted-foreground/25" />
+                      <span className="h-1 w-full rounded-full bg-muted-foreground/15" />
+                      <span className="h-1 w-full rounded-full bg-muted-foreground/15" />
+                      <span className="h-1 w-1/2 rounded-full bg-muted-foreground/15" />
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[11px]",
+                      clampPage(curPage) === pi + 1 ? "font-semibold text-brand" : "text-muted-foreground",
+                    )}
+                  >
+                    {pi + 1}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* 卷面 */}
+            <div className="min-h-0 flex-1 overflow-auto p-6">
+              <div className="mx-auto flex max-w-3xl justify-center">
+                <div
+                  style={{
+                    transform: `scale(${zoom / 100}) rotate(${rotate}deg)`,
+                    transformOrigin: "top center",
+                    width: "100%",
+                  }}
+                >
+                  <PaperSheet
+                    pageIndex={clampPage(curPage)}
+                    size={paper}
+                    items={pageItems}
+                    boxes={boxes}
+                    showAll={showAll}
+                    selected={selected}
+                    tool={tool}
+                    noteOf={noteOf}
+                    onSelect={(id) => {
+                      setSelected(id)
+                      setTab("byQ")
+                    }}
+                    onToggleBox={toggleBox}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -312,7 +372,7 @@ export function DotPenLayout({
         <aside className="hidden w-[340px] shrink-0 flex-col border-l border-border bg-card md:flex">
           <div className="flex shrink-0 border-b border-border">
             <TabBtn active={tab === "byQ"} onClick={() => setTab("byQ")} icon={Rows3}>
-              按题查看
+              按题目查看
             </TabBtn>
             <TabBtn active={tab === "byLevel"} onClick={() => setTab("byLevel")} icon={ListTree}>
               按层级查看
@@ -320,44 +380,65 @@ export function DotPenLayout({
           </div>
 
           {tab === "byQ" ? (
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              <div className="mb-2 flex items-center gap-3 px-1 text-[11px] text-muted-foreground">
-                <StatusChip status="done" /> 已框选
-                <StatusChip status="warn" /> 缺答案框
-                <StatusChip status="none" /> 未框选
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+                <span className="text-sm font-semibold text-foreground">题目</span>
+                <button
+                  onClick={() => {
+                    setChecked(new Set(flat.map((f) => f.q.id)))
+                    setBatchOpen(true)
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-brand transition hover:opacity-80"
+                >
+                  批量设置
+                  <Settings2 className="size-3.5" />
+                </button>
               </div>
-              <div className="flex flex-col gap-1.5">
-                {flat.map((f) => {
-                  const st = statusOf(f.q.id)
-                  return (
-                    <button
-                      key={f.q.id}
-                      onClick={() => {
-                        setSelected(f.q.id)
-                        setConfigFor(f.q.id)
-                      }}
-                      className={cn(
-                        "flex items-start gap-2 rounded-lg border p-2.5 text-left transition",
-                        selected === f.q.id
-                          ? "border-brand bg-brand-soft/50"
-                          : "border-border hover:border-brand/40",
-                      )}
-                    >
-                      <StatusIcon status={st} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-semibold text-muted-foreground">{f.gi}.</span>
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            {f.q.qType}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground">{scores[f.q.id]} 分</span>
-                        </div>
-                        <p className="mt-1 line-clamp-1 text-xs text-foreground">{f.q.short}</p>
-                      </div>
-                      <Settings2 className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                    </button>
-                  )
-                })}
+              <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                <div className="flex flex-col">
+                  {flat.map((f) => {
+                    const note = noteOf(f)
+                    return (
+                      <button
+                        key={f.q.id}
+                        onClick={() => {
+                          setSelected(f.q.id)
+                          setConfigFor(f.q.id)
+                        }}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-2 py-2.5 text-left transition",
+                          selected === f.q.id ? "bg-brand-soft/50" : "hover:bg-muted",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "grid size-6 shrink-0 place-items-center rounded-md text-xs font-bold",
+                            note.tone === "green"
+                              ? "bg-brand text-brand-foreground"
+                              : "bg-warn text-warn-foreground",
+                          )}
+                        >
+                          {f.gi}
+                        </span>
+                        <span className="flex-1 text-sm font-medium text-foreground">小题-{f.gi}</span>
+                        <span className="text-xs text-muted-foreground">{qTypeFull(f.q.qType)}</span>
+                        <span className="w-10 text-right text-sm font-semibold text-brand">{scores[f.q.id]}分</span>
+                        <span
+                          className={cn(
+                            "w-16 text-right text-xs font-medium",
+                            note.tone === "green"
+                              ? "text-easy"
+                              : note.tone === "orange"
+                                ? "text-warn-foreground"
+                                : "text-destructive",
+                          )}
+                        >
+                          {note.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           ) : (
@@ -454,11 +535,12 @@ export function DotPenLayout({
           count={checked.size}
           onClose={() => setBatchOpen(false)}
           onApply={(sc) => {
-            if (sc != null) setScores((prev) => {
-              const next = { ...prev }
-              checked.forEach((id) => (next[id] = sc))
-              return next
-            })
+            if (sc != null)
+              setScores((prev) => {
+                const next = { ...prev }
+                checked.forEach((id) => (next[id] = sc))
+                return next
+              })
             setBatchOpen(false)
           }}
         />
@@ -467,67 +549,70 @@ export function DotPenLayout({
   )
 }
 
+function qTypeFull(t: QType) {
+  return t === "单选"
+    ? "单项选择题"
+    : t === "多选"
+      ? "多项选择题"
+      : t === "填空"
+        ? "填空题"
+        : t === "判断"
+          ? "判断题"
+          : "主观题"
+}
+
 /* ---------------------------- 卷面 ---------------------------- */
 
 function PaperSheet({
   pageIndex,
-  pageCount,
   size,
-  columns,
-  fontSize,
   items,
   boxes,
+  showAll,
   selected,
-  autoFrame,
   tool,
+  noteOf,
   onSelect,
   onToggleBox,
 }: {
   pageIndex: number
-  pageCount: number
   size: PaperSize
-  columns: 1 | 2
-  fontSize: "小" | "中" | "大"
   items: { q: Question; score: number; gi: number; secTitle: string; secIdx: number }[]
   boxes: BoxState
+  showAll: boolean
   selected: string | null
-  autoFrame: boolean
-  tool: Tool
+  tool: Tool | null
+  noteOf: (f: { q: Question }) => { label: string; tone: "green" | "orange" | "red" }
   onSelect: (id: string) => void
   onToggleBox: (id: string, kind: "q" | "a") => void
 }) {
-  const fsCls = fontSize === "小" ? "text-[11px]" : fontSize === "大" ? "text-[15px]" : "text-[13px]"
   return (
     <div className="w-full">
-      <div className="mb-1.5 flex items-center justify-between px-1 text-[11px] text-muted-foreground">
-        <span>{PAPER[size].label}</span>
-        <span>第 {pageIndex} / {pageCount} 页</span>
-      </div>
       <div
         className="relative rounded-sm bg-white shadow-md ring-1 ring-border"
         style={{
           aspectRatio: PAPER[size].ratio,
-          backgroundImage:
-            "radial-gradient(oklch(0.85 0.02 250 / 0.5) 0.5px, transparent 0.5px)",
+          backgroundImage: "radial-gradient(oklch(0.85 0.02 250 / 0.5) 0.5px, transparent 0.5px)",
           backgroundSize: "6px 6px",
         }}
       >
         <div className="absolute inset-0 overflow-hidden p-[5%]">
           {pageIndex === 1 && (
-            <div className="mb-3 border-b-2 border-neutral-800 pb-2 text-center">
-              <p className="text-sm font-bold text-neutral-900">课堂练习（点阵笔作答）</p>
-              <p className="mt-0.5 text-[10px] text-neutral-500">
-                姓名：__________ 班级：__________ 学号：__________
-              </p>
-            </div>
+            <>
+              <div className="mb-1 text-center text-base font-bold text-neutral-900">
+                七年级数学周练（第5周）
+              </div>
+              <p className="mb-3 text-center text-[11px] text-neutral-500">时间：90分钟　满分：100分</p>
+            </>
           )}
-          <div
-            className={cn("gap-x-4", columns === 2 ? "columns-2" : "columns-1")}
-          >
-            {items.map((it) => {
+          <div className="columns-1 gap-x-4">
+            {items.map((it, idx) => {
               const b = boxes[it.q.id] ?? { q: false, a: false }
               const isSel = selected === it.q.id
-              const unframed = !b.q && !b.a
+              const note = noteOf(it)
+              const unframed = note.tone === "red"
+              const showQ = b.q && showAll
+              const showA = b.a && showAll
               return (
                 <div
                   key={it.q.id}
@@ -538,54 +623,65 @@ function PaperSheet({
                   )}
                   onClick={() => onSelect(it.q.id)}
                 >
-                  {/* 题目框 */}
+                  {/* 章节标题（每节首题） */}
+                  {(idx === 0 || items[idx - 1]?.secIdx !== it.secIdx) && (
+                    <p className="mb-1 text-[12px] font-bold text-neutral-800">
+                      {CN_NUM[it.secIdx]}、{it.secTitle}
+                    </p>
+                  )}
+                  {/* 题目区 */}
                   <div
                     className={cn(
                       "relative rounded-sm p-1",
-                      b.q ? "outline outline-1 outline-sky-400 bg-sky-400/5" : "",
-                      !autoFrame && "cursor-pointer",
+                      showQ ? "outline outline-1 outline-sky-400 bg-sky-400/5" : "",
+                      tool && tool !== "作答框" && "cursor-pointer",
                     )}
                     onClick={(e) => {
-                      if (!autoFrame && tool === "题目框") {
+                      if (tool && tool !== "作答框") {
                         e.stopPropagation()
                         onToggleBox(it.q.id, "q")
                       }
                     }}
                   >
-                    {b.q && <FrameTag className="bg-sky-500" label="题目框" />}
-                    <p className={cn("leading-snug text-neutral-900", fsCls)}>
+                    {showQ && <FrameTag className="bg-sky-500" label={`题目区 ${it.gi}`} />}
+                    {showQ && note.tone !== "green" && (
+                      <span className="absolute right-1 top-1 rounded bg-warn px-1.5 py-0.5 text-[9px] font-medium text-warn-foreground">
+                        {note.label}
+                      </span>
+                    )}
+                    <p className="text-[13px] leading-snug text-neutral-900">
                       <span className="font-semibold">{it.gi}. </span>
                       {it.q.short}
                       <span className="ml-1 text-[10px] text-neutral-400">（{it.score}分）</span>
                     </p>
                     {it.q.options && (
-                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
+                      <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5">
                         {it.q.options.map((o) => (
-                          <span key={o.key} className={cn("text-neutral-700", fsCls)}>
+                          <span key={o.key} className="text-[13px] text-neutral-700">
                             {o.key}. {o.content}
                           </span>
                         ))}
                       </div>
                     )}
                   </div>
-                  {/* 答案框 */}
+                  {/* 作答区 */}
                   <div
                     className={cn(
                       "relative mt-1 rounded-sm",
-                      b.a
+                      showA
                         ? "outline outline-1 outline-[oklch(0.58_0.1_158)] bg-brand/5"
                         : "border border-dashed border-neutral-300",
                       it.q.qType === "主观" ? "h-12" : it.q.qType === "填空" ? "h-7" : "h-6",
-                      !autoFrame && "cursor-pointer",
+                      tool === "作答框" && "cursor-pointer",
                     )}
                     onClick={(e) => {
-                      if (!autoFrame && tool === "答案框") {
+                      if (tool === "作答框") {
                         e.stopPropagation()
                         onToggleBox(it.q.id, "a")
                       }
                     }}
                   >
-                    {b.a && <FrameTag className="bg-[oklch(0.58_0.1_158)]" label="答案框" />}
+                    {showA && <FrameTag className="bg-[oklch(0.58_0.1_158)]" label={`作答区 ${it.gi}`} />}
                     <span className="absolute left-1 top-0.5 text-[9px] text-neutral-400">作答区</span>
                   </div>
                 </div>
@@ -601,10 +697,7 @@ function PaperSheet({
 function FrameTag({ label, className }: { label: string; className?: string }) {
   return (
     <span
-      className={cn(
-        "absolute -top-2 left-1 z-10 rounded px-1 text-[8px] font-medium text-white",
-        className,
-      )}
+      className={cn("absolute -top-2 left-1 z-10 rounded px-1 text-[8px] font-medium text-white", className)}
     >
       {label}
     </span>
@@ -697,7 +790,9 @@ function AnswerConfig({
 }) {
   if (q.qType === "单选" || q.qType === "多选") {
     const multi = q.qType === "多选"
-    const opts = q.options ?? [{ key: "A" }, { key: "B" }, { key: "C" }, { key: "D" }].map((o) => ({ ...o, content: "" }))
+    const opts =
+      q.options ??
+      [{ key: "A" }, { key: "B" }, { key: "C" }, { key: "D" }].map((o) => ({ ...o, content: "" }))
     return (
       <div className="flex flex-wrap gap-2">
         {opts.map((o) => {
@@ -707,11 +802,7 @@ function AnswerConfig({
               key={o.key}
               onClick={() =>
                 setCorrect(
-                  multi
-                    ? on
-                      ? correct.filter((c) => c !== o.key)
-                      : [...correct, o.key]
-                    : [o.key],
+                  multi ? (on ? correct.filter((c) => c !== o.key) : [...correct, o.key]) : [o.key],
                 )
               }
               className={cn(
@@ -836,59 +927,52 @@ function BatchModal({
 
 /* ---------------------------- 小组件 ---------------------------- */
 
-function StepDot({ n, label, done, active }: { n: number; label: string; done?: boolean; active?: boolean }) {
+function HeaderBtn({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) {
   return (
-    <span className="flex items-center gap-1.5">
-      <span
-        className={cn(
-          "grid size-4 place-items-center rounded-full text-[10px] font-bold",
-          done
-            ? "bg-brand text-brand-foreground"
-            : active
-              ? "bg-brand text-brand-foreground"
-              : "bg-muted text-muted-foreground",
-        )}
-      >
-        {done ? "✓" : n}
-      </span>
-      <span className={cn(active || done ? "font-medium text-foreground" : "")}>{label}</span>
-    </span>
-  )
-}
-
-function SideTitle({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) {
-  return (
-    <h3 className="mb-2 flex items-center gap-1.5 text-xs font-bold text-foreground">
-      <Icon className="size-3.5 text-brand" />
+    <button className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted">
+      <Icon className="size-4" />
       {children}
-    </h3>
+    </button>
   )
 }
 
-function Segmented({
-  value,
-  options,
-  onChange,
+function ToolIcon({
+  children,
+  onClick,
+  disabled,
 }: {
-  value: string
-  options: { v: string; l: string }[]
-  onChange: (v: string) => void
+  children: React.ReactNode
+  onClick: () => void
+  disabled?: boolean
 }) {
   return (
-    <div className="flex rounded-lg bg-muted p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.v}
-          onClick={() => onChange(o.v)}
-          className={cn(
-            "flex-1 rounded-md py-1 text-xs font-medium transition",
-            value === o.v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
-          )}
-        >
-          {o.l}
-        </button>
-      ))}
-    </div>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="grid size-7 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-30"
+    >
+      {children}
+    </button>
+  )
+}
+
+function ToolText({
+  icon: Icon,
+  children,
+  onClick,
+}: {
+  icon: React.ElementType
+  children: React.ReactNode
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+    >
+      <Icon className="size-3.5" />
+      {children}
+    </button>
   )
 }
 
@@ -950,16 +1034,6 @@ function StatusIcon({ status }: { status: "done" | "warn" | "none" }) {
   return <XCircle className="size-4 shrink-0 text-destructive" />
 }
 
-function StatusChip({ status }: { status: "done" | "warn" | "none" }) {
-  const cls =
-    status === "done"
-      ? "bg-easy"
-      : status === "warn"
-        ? "bg-warn"
-        : "bg-destructive"
-  return <span className={cn("inline-block size-2 rounded-full", cls)} />
-}
-
 function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -984,10 +1058,7 @@ function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal>
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
-        className={cn(
-          "relative w-full rounded-2xl bg-card p-5 shadow-xl",
-          wide ? "max-w-lg" : "max-w-sm",
-        )}
+        className={cn("relative w-full rounded-2xl bg-card p-5 shadow-xl", wide ? "max-w-lg" : "max-w-sm")}
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-bold text-foreground">{title}</h3>
