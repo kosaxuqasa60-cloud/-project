@@ -1317,7 +1317,7 @@ export function ResourceWorkbench() {
       questions.filter((q) => {
         if (qType !== "全部" && q.qType !== qType) return false
         if (source !== "全部" && q.level !== source) return false
-        if (diff !== "全部" && q.difficulty !== diff) return false
+        if (diff !== "���部" && q.difficulty !== diff) return false
         return true
       }),
     [qType, source, diff],
@@ -1619,7 +1619,7 @@ export function ResourceWorkbench() {
             </div>
           ) : resourceType === "微课" ? (
             microView === "grid" ? (
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                 {otherData.map((item) => (
                   <MicroCard key={item.id} item={item} onPreview={() => {}} />
                 ))}
