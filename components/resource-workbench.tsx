@@ -871,27 +871,34 @@ export function ResourceWorkbench() {
           ? microData
           : premiumData
 
+  /* 组卷 / 生成练习：全屏接管，隐藏应用左侧导航与顶栏 */
+  if (composing) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background">
+        <ExerciseComposer
+          items={cartItems}
+          onBack={() => setComposing(false)}
+          onRemove={(id) => toggle(id)}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="relative flex h-full min-h-0">
-      {/* 左侧目录栏（组卷/生成练习时隐藏） */}
+      {/* 左侧目录栏 */}
       <aside
         className={cn(
           "hidden shrink-0 overflow-y-auto border-r border-border bg-card transition-all lg:block",
-          sidebarOpen && !composing ? "w-64 p-3" : "w-0 overflow-hidden p-0",
+          sidebarOpen ? "w-64 p-3" : "w-0 overflow-hidden p-0",
         )}
       >
-        {sidebarOpen && !composing && <ChapterSidebar onSwitchTextbook={() => setSwitcherOpen(true)} />}
+        {sidebarOpen && <ChapterSidebar onSwitchTextbook={() => setSwitcherOpen(true)} />}
       </aside>
 
       {/* 主区域 */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {composing ? (
-          <ExerciseComposer
-            items={cartItems}
-            onBack={() => setComposing(false)}
-            onRemove={(id) => toggle(id)}
-          />
-        ) : previewPaper ? (
+        {previewPaper ? (
           <PaperDetail
             paper={previewPaper}
             premium={isPremium}

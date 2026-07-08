@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import {
   ChevronLeft,
   ChevronDown,
@@ -57,6 +57,14 @@ export type LaidSection = { id: string; title: string; items: { q: Question; sco
 
 type BoxState = Record<string, { q: boolean; a: boolean }>
 type Tool = "题目框" | "小题框" | "作答框"
+/* 手动拖拽绘制的自定义框，坐标为占卷面的比例 0~1 */
+type CustomBox = { id: string; page: number; tool: Tool; x: number; y: number; w: number; h: number }
+
+const TOOL_STYLE: Record<Tool, { ring: string; tag: string; fill: string }> = {
+  题目框: { ring: "outline-sky-500", tag: "bg-sky-500", fill: "bg-sky-400/10" },
+  小题框: { ring: "outline-medium", tag: "bg-medium", fill: "bg-medium/10" },
+  作答框: { ring: "outline-[oklch(0.58_0.1_158)]", tag: "bg-[oklch(0.58_0.1_158)]", fill: "bg-brand/10" },
+}
 
 export function DotPenLayout({
   name,
@@ -79,6 +87,11 @@ export function DotPenLayout({
   const [curPage, setCurPage] = useState(1)
   const [zoom, setZoom] = useState(100)
   const [rotate, setRotate] = useState(0)
+  const [customBoxes, setCustomBoxes] = useState<CustomBox[]>([])
+
+  const addCustomBox = (page: number, t: Tool, r: { x: number; y: number; w: number; h: number }) =>
+    setCustomBoxes((prev) => [...prev, { id: `cb-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, page, tool: t, ...r }])
+  const removeCustomBox = (id: string) => setCustomBoxes((prev) => prev.filter((b) => b.id !== id))
 
   /* 展开题目序列 */
   const flat = useMemo(() => {
@@ -223,7 +236,7 @@ export function DotPenLayout({
 
           <h3 className="mb-2 text-xs font-bold text-foreground">手动框选</h3>
           <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
-            选择工具后，在卷面点击对应区域即可增删框。
+            选中工具后，在卷面上<span className="font-medium text-foreground">按住拖拽</span>即可绘制框；点框右上角 × 删除。
           </p>
           <div className="mb-4 flex flex-col gap-2">
             {(["题目框", "小题框", "作答框"] as Tool[]).map((t) => {
@@ -356,6 +369,9 @@ export function DotPenLayout({
                     selected={selected}
                     tool={tool}
                     noteOf={noteOf}
+                    customBoxes={customBoxes.filter((b) => b.page === clampPage(curPage))}
+                    onDrawBox={(r) => addCustomBox(clampPage(curPage), tool!, r)}
+                    onRemoveCustom={removeCustomBox}
                     onSelect={(id) => {
                       setSelected(id)
                       setTab("byQ")
@@ -532,15 +548,13 @@ export function DotPenLayout({
       {/* 批量设置弹窗 */}
       {batchOpen && (
         <BatchModal
-          count={checked.size}
+          sections={sections}
+          scores={scores}
+          checkedIds={checked}
+          pages={pages.length}
           onClose={() => setBatchOpen(false)}
-          onApply={(sc) => {
-            if (sc != null)
-              setScores((prev) => {
-                const next = { ...prev }
-                checked.forEach((id) => (next[id] = sc))
-                return next
-              })
+          onApply={(map) => {
+            setScores((prev) => ({ ...prev, ...map }))
             setBatchOpen(false)
           }}
         />
@@ -572,6 +586,9 @@ function PaperSheet({
   selected,
   tool,
   noteOf,
+  customBoxes,
+  onDrawBox,
+  onRemoveCustom,
   onSelect,
   onToggleBox,
 }: {
@@ -583,12 +600,50 @@ function PaperSheet({
   selected: string | null
   tool: Tool | null
   noteOf: (f: { q: Question }) => { label: string; tone: "green" | "orange" | "red" }
+  customBoxes: CustomBox[]
+  onDrawBox: (r: { x: number; y: number; w: number; h: number }) => void
+  onRemoveCustom: (id: string) => void
   onSelect: (id: string) => void
   onToggleBox: (id: string, kind: "q" | "a") => void
 }) {
+  const sheetRef = useRef<HTMLDivElement>(null)
+  const [draft, setDraft] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const startRef = useRef<{ x: number; y: number } | null>(null)
+
+  const frac = (clientX: number, clientY: number) => {
+    const el = sheetRef.current
+    if (!el) return { x: 0, y: 0 }
+    const r = el.getBoundingClientRect()
+    return {
+      x: Math.min(1, Math.max(0, (clientX - r.left) / r.width)),
+      y: Math.min(1, Math.max(0, (clientY - r.top) / r.height)),
+    }
+  }
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (!tool) return
+    e.preventDefault()
+    ;(e.target as Element).setPointerCapture?.(e.pointerId)
+    const p = frac(e.clientX, e.clientY)
+    startRef.current = p
+    setDraft({ x: p.x, y: p.y, w: 0, h: 0 })
+  }
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!tool || !startRef.current) return
+    const p = frac(e.clientX, e.clientY)
+    const s = startRef.current
+    setDraft({ x: Math.min(s.x, p.x), y: Math.min(s.y, p.y), w: Math.abs(p.x - s.x), h: Math.abs(p.y - s.y) })
+  }
+  const onPointerUp = () => {
+    if (draft && draft.w > 0.02 && draft.h > 0.01) onDrawBox(draft)
+    startRef.current = null
+    setDraft(null)
+  }
+
   return (
     <div className="w-full">
       <div
+        ref={sheetRef}
         className="relative rounded-sm bg-white shadow-md ring-1 ring-border"
         style={{
           aspectRatio: PAPER[size].ratio,
@@ -689,6 +744,57 @@ function PaperSheet({
             })}
           </div>
         </div>
+
+        {/* 手动绘制的自定义框 */}
+        {showAll &&
+          customBoxes.map((b) => {
+            const st = TOOL_STYLE[b.tool]
+            return (
+              <div
+                key={b.id}
+                className={cn("group absolute z-10 rounded-sm outline outline-2", st.ring, st.fill)}
+                style={{
+                  left: `${b.x * 100}%`,
+                  top: `${b.y * 100}%`,
+                  width: `${b.w * 100}%`,
+                  height: `${b.h * 100}%`,
+                }}
+              >
+                <span className={cn("absolute -top-2.5 left-0 rounded px-1 text-[8px] font-medium text-white", st.tag)}>
+                  {b.tool}
+                </span>
+                <button
+                  onClick={() => onRemoveCustom(b.id)}
+                  className="absolute -right-2 -top-2 grid size-4 place-items-center rounded-full bg-destructive text-[10px] text-white opacity-0 shadow transition group-hover:opacity-100"
+                  aria-label="删除框"
+                >
+                  <X className="size-2.5" />
+                </button>
+              </div>
+            )
+          })}
+
+        {/* 绘制交互层（选中工具后覆盖卷面，拖拽画框） */}
+        {tool && (
+          <div
+            className="absolute inset-0 z-20 cursor-crosshair touch-none"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+          >
+            {draft && (
+              <div
+                className={cn("absolute rounded-sm outline outline-2 outline-dashed", TOOL_STYLE[tool].ring, TOOL_STYLE[tool].fill)}
+                style={{
+                  left: `${draft.x * 100}%`,
+                  top: `${draft.y * 100}%`,
+                  width: `${draft.w * 100}%`,
+                  height: `${draft.h * 100}%`,
+                }}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -876,52 +982,232 @@ function AnswerConfig({
 
 /* ---------------------------- 批量设置 ---------------------------- */
 
+const QTYPE_OPTIONS: QType[] = ["单选", "多选", "填空", "判断", "主观"]
+const regionCountOf = (t: QType) => (t === "填空" ? 4 : t === "主观" ? 1 : 1)
+
+type BItem = { id: string; label: string; qType: QType; regions: { id: string; answer: string; score: number }[] }
+type BSection = { id: string; title: string; open: boolean; items: BItem[] }
+
 function BatchModal({
-  count,
+  sections,
+  scores,
+  checkedIds,
+  pages,
   onClose,
   onApply,
 }: {
-  count: number
+  sections: LaidSection[]
+  scores: Record<string, number>
+  checkedIds: Set<string>
+  pages: number
   onClose: () => void
-  onApply: (score: number | null) => void
+  onApply: (map: Record<string, number>) => void
 }) {
-  const [enableScore, setEnableScore] = useState(true)
-  const [sc, setSc] = useState(3)
+  const [data, setData] = useState<BSection[]>(() =>
+    sections
+      .map((sec, si) => {
+        const items = sec.items
+          .filter((it) => checkedIds.has(it.q.id))
+          .map((it, idx) => {
+            const rc = regionCountOf(it.q.qType)
+            const per = Math.max(1, Math.round((scores[it.q.id] ?? it.score) / rc))
+            return {
+              id: it.q.id,
+              label: `${CN_NUM[si]}·${idx + 1}`,
+              qType: it.q.qType,
+              regions: Array.from({ length: rc }, (_, r) => ({ id: `${it.q.id}-r${r}`, answer: "", score: per })),
+            } as BItem
+          })
+        return { id: sec.id, title: sec.title, open: true, items }
+      })
+      .filter((s) => s.items.length > 0),
+  )
+  const [curPage, setCurPage] = useState(1)
+
+  const itemScore = (it: BItem) => it.regions.reduce((s, r) => s + r.score, 0)
+  const secScore = (s: BSection) => s.items.reduce((sum, it) => sum + itemScore(it), 0)
+  const totalCount = data.reduce((n, s) => n + s.items.length, 0)
+
+  const patchSec = (sid: string, fn: (s: BSection) => BSection) =>
+    setData((prev) => prev.map((s) => (s.id === sid ? fn(s) : s)))
+  const patchItem = (sid: string, iid: string, fn: (it: BItem) => BItem) =>
+    patchSec(sid, (s) => ({ ...s, items: s.items.map((it) => (it.id === iid ? fn(it) : it)) }))
+
+  const setSecType = (sid: string, t: QType) =>
+    patchSec(sid, (s) => ({
+      ...s,
+      items: s.items.map((it) => {
+        const rc = regionCountOf(t)
+        const per = it.regions[0]?.score ?? 2
+        return { ...it, qType: t, regions: Array.from({ length: rc }, (_, r) => it.regions[r] ?? { id: `${it.id}-r${r}`, answer: "", score: per }) }
+      }),
+    }))
+  const setSecPer = (sid: string, per: number) =>
+    patchSec(sid, (s) => ({ ...s, items: s.items.map((it) => ({ ...it, regions: it.regions.map((r) => ({ ...r, score: per })) })) }))
+
+  const apply = () => {
+    const map: Record<string, number> = {}
+    data.forEach((s) => s.items.forEach((it) => (map[it.id] = itemScore(it))))
+    onApply(map)
+  }
+
   return (
-    <Modal title={`批量设置 · 已选 ${count} 题`} onClose={onClose}>
-      <div className="flex flex-col gap-4">
-        <label className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
-          <span className="text-sm font-medium text-foreground">统一分值</span>
-          <Switch on={enableScore} onChange={setEnableScore} />
-        </label>
-        {enableScore && (
-          <div className="flex items-center gap-2 pl-1">
-            <span className="text-sm text-muted-foreground">每题</span>
-            <input
-              type="number"
-              value={sc}
-              onChange={(e) => setSc(Number(e.target.value) || 0)}
-              className="w-24 rounded-md border border-input bg-card px-2.5 py-1.5 text-sm outline-none focus:border-brand"
-            />
-            <span className="text-sm text-muted-foreground">分</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal>
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-xl">
+        {/* 头 */}
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+          <h3 className="text-base font-bold text-foreground">批量设置 · 共 {totalCount} 小题</h3>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            aria-label="关闭"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* 表头 */}
+        <div className="flex shrink-0 items-center gap-3 bg-muted/70 px-5 py-2.5 text-xs font-bold text-foreground">
+          <span className="w-52 shrink-0">题号</span>
+          <span className="flex-1">题型 / 答案</span>
+          <span className="w-24 shrink-0 text-right">分值</span>
+        </div>
+
+        {/* 表体 */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {data.map((s) => (
+            <div key={s.id}>
+              {/* 大题行 */}
+              <div className="flex items-center gap-3 border-b border-border bg-secondary/40 px-5 py-2.5">
+                <div className="flex w-52 shrink-0 items-center gap-1.5">
+                  <button
+                    onClick={() => patchSec(s.id, (x) => ({ ...x, open: !x.open }))}
+                    className="grid size-5 place-items-center rounded text-muted-foreground transition hover:bg-muted"
+                  >
+                    {s.open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                  </button>
+                  <span className="text-sm font-bold text-foreground">{s.title}</span>
+                </div>
+                <div className="flex flex-1 items-center gap-2">
+                  <select
+                    defaultValue=""
+                    onChange={(e) => e.target.value && setSecType(s.id, e.target.value as QType)}
+                    className="w-40 rounded-md border border-input bg-card px-2 py-1.5 text-sm text-foreground outline-none focus:border-brand"
+                  >
+                    <option value="">请选择</option>
+                    {QTYPE_OPTIONS.map((t) => (
+                      <option key={t} value={t}>{qTypeFull(t)}</option>
+                    ))}
+                  </select>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      placeholder="每作答区分值"
+                      onChange={(e) => e.target.value && setSecPer(s.id, Number(e.target.value) || 0)}
+                      className="w-32 rounded-md border border-input bg-card py-1.5 pl-2 pr-6 text-sm outline-none placeholder:text-muted-foreground focus:border-brand"
+                    />
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">分</span>
+                  </div>
+                </div>
+                <span className="w-24 shrink-0 text-right text-sm font-bold text-foreground">{secScore(s).toFixed(1)}分</span>
+              </div>
+
+              {/* 小题 + 作答区 */}
+              {s.open &&
+                s.items.map((it) => (
+                  <div key={it.id}>
+                    {/* 小题行 */}
+                    <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-5 py-2.5">
+                      <div className="flex w-52 shrink-0 items-center gap-2 pl-6">
+                        <span className="text-[13px] text-muted-foreground">小题框</span>
+                        <div className="flex items-center gap-1 rounded-md border border-input bg-card px-2 py-1">
+                          <span className="text-[11px] text-muted-foreground">题号</span>
+                          <input
+                            value={it.label}
+                            onChange={(e) => patchItem(s.id, it.id, (x) => ({ ...x, label: e.target.value }))}
+                            className="w-14 bg-transparent text-[13px] text-foreground outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <select
+                          value={it.qType}
+                          onChange={(e) => patchItem(s.id, it.id, (x) => {
+                            const t = e.target.value as QType
+                            const rc = regionCountOf(t)
+                            const per = x.regions[0]?.score ?? 2
+                            return { ...x, qType: t, regions: Array.from({ length: rc }, (_, r) => x.regions[r] ?? { id: `${x.id}-r${r}`, answer: "", score: per }) }
+                          })}
+                          className="w-40 rounded-md border border-input bg-card px-2 py-1.5 text-sm text-foreground outline-none focus:border-brand"
+                        >
+                          {QTYPE_OPTIONS.map((t) => (
+                            <option key={t} value={t}>{qTypeFull(t)}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <span className="w-24 shrink-0 text-right text-sm font-semibold text-foreground">{itemScore(it).toFixed(1)}分</span>
+                    </div>
+                    {/* 作答区行 */}
+                    {it.regions.map((r, ri) => (
+                      <div key={r.id} className="flex items-center gap-3 border-b border-border px-5 py-2">
+                        <span className="w-52 shrink-0 pl-16 text-[13px] text-muted-foreground">作答区{ri + 1}</span>
+                        <div className="flex-1">
+                          <input
+                            value={r.answer}
+                            placeholder="请输入答案"
+                            onChange={(e) => patchItem(s.id, it.id, (x) => ({ ...x, regions: x.regions.map((rr) => (rr.id === r.id ? { ...rr, answer: e.target.value } : rr)) }))}
+                            className="w-full rounded-md border border-input bg-card px-2.5 py-1.5 text-sm outline-none placeholder:text-muted-foreground focus:border-brand"
+                          />
+                        </div>
+                        <div className="relative w-24 shrink-0">
+                          <input
+                            type="number"
+                            value={r.score}
+                            onChange={(e) => patchItem(s.id, it.id, (x) => ({ ...x, regions: x.regions.map((rr) => (rr.id === r.id ? { ...rr, score: Number(e.target.value) || 0 } : rr)) }))}
+                            className="w-full rounded-md border border-input bg-card py-1.5 pl-2.5 pr-6 text-sm outline-none focus:border-brand"
+                          />
+                          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">分</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+            </div>
+          ))}
+        </div>
+
+        {/* 底部：缩放/翻页（示意） + 操作 */}
+        <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+          <div className="flex items-center gap-3 rounded-full bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+            <span className="font-medium">25%</span>
+            <Plus className="size-3.5" />
+            <span className="h-3 w-px bg-border" />
+            <button onClick={() => setCurPage((p) => Math.max(1, p - 1))} className="transition hover:text-foreground">
+              <ChevronLeft className="size-3.5" />
+            </button>
+            <span className="font-medium text-foreground underline">{curPage}</span>
+            <button onClick={() => setCurPage((p) => Math.min(pages, p + 1))} className="transition hover:text-foreground">
+              <ChevronRight className="size-3.5" />
+            </button>
           </div>
-        )}
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-brand/40 px-6 py-2 text-sm font-medium text-brand transition hover:bg-brand-soft/50"
+            >
+              取消
+            </button>
+            <button
+              onClick={apply}
+              className="rounded-lg bg-brand px-6 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+            >
+              确定
+            </button>
+          </div>
+        </div>
       </div>
-      <div className="mt-5 flex justify-end gap-2">
-        <button
-          onClick={onClose}
-          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-        >
-          取消
-        </button>
-        <button
-          onClick={() => onApply(enableScore ? sc : null)}
-          className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
-        >
-          应用到 {count} 题
-        </button>
-      </div>
-    </Modal>
+    </div>
   )
 }
 
