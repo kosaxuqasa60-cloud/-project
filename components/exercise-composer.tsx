@@ -26,10 +26,12 @@ import {
   Search,
   ListPlus,
   CornerDownRight,
+  ScanLine,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SourceBadge } from "@/components/source-badge"
 import { questions as bank, type Question, type QType } from "@/components/resource-workbench"
+import { DotPenLayout, type LaidSection } from "@/components/dotpen-layout"
 
 /* 题型顺序与大题标题 */
 const TYPE_ORDER: QType[] = ["单选", "多选", "填空", "判断", "主观"]
@@ -76,6 +78,7 @@ export function ExerciseComposer({
 }) {
   const [name, setName] = useState("第15章 一元一次不等式 · 课堂练习")
   const [drawer, setDrawer] = useState<DrawerKey | null>("order")
+  const [layoutOpen, setLayoutOpen] = useState(false)
 
   /* 题库映射（含跟进练习可选题） */
   const bankMap = useMemo(() => Object.fromEntries(bank.map((q) => [q.id, q])), [])
@@ -194,11 +197,38 @@ export function ExerciseComposer({
 
   let globalIdx = 0
 
+  /* 传入排版页的大题结构（含已解析题目与分值） */
+  const resolvedSections: LaidSection[] = sections.map((s) => ({
+    id: s.id,
+    title: s.title,
+    items: s.questionIds
+      .map((id) => {
+        const q = lookup(id)
+        return q ? { q, score: scoreOf(q) } : null
+      })
+      .filter(Boolean) as { q: Question; score: number }[],
+  }))
+
+  if (layoutOpen) {
+    return <DotPenLayout name={name} sections={resolvedSections} onBack={() => setLayoutOpen(false)} />
+  }
+
   return (
     <div className="flex h-full min-h-0">
       {/* 主编辑区 */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <ComposerHeader name={name} setName={setName} total={total} count={allIds.length} classes={classes} onBack={onBack} />
+        <ComposerHeader
+          name={name}
+          setName={setName}
+          total={total}
+          count={allIds.length}
+          classes={classes}
+          onBack={onBack}
+          answerMode={answerMode}
+          onPrimary={() => {
+            if (answerMode === "点阵笔纸质") setLayoutOpen(true)
+          }}
+        />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -389,6 +419,8 @@ function ComposerHeader({
   count,
   classes,
   onBack,
+  answerMode,
+  onPrimary,
 }: {
   name: string
   setName: (v: string) => void
@@ -396,7 +428,10 @@ function ComposerHeader({
   count: number
   classes: string[]
   onBack: () => void
+  answerMode: string
+  onPrimary: () => void
 }) {
+  const isDotPen = answerMode === "点阵笔纸质"
   return (
     <div className="sticky top-0 z-10 border-b border-border bg-background/85 px-5 py-3 backdrop-blur">
       <button
@@ -424,9 +459,12 @@ function ComposerHeader({
           <button className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground transition hover:bg-muted">
             存为草稿
           </button>
-          <button className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90">
-            <ClipboardList className="size-4" />
-            保存并去布置
+          <button
+            onClick={onPrimary}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+          >
+            {isDotPen ? <ScanLine className="size-4" /> : <ClipboardList className="size-4" />}
+            {isDotPen ? "下一步：排版与框选" : "保存并去布置"}
           </button>
         </div>
       </div>
