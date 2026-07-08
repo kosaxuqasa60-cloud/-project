@@ -9,6 +9,7 @@ import {
   ShoppingCart,
   Rows3,
   StretchHorizontal,
+  LayoutGrid,
   PlayCircle,
   FileText,
   PanelLeftClose,
@@ -251,7 +252,7 @@ export const questions: Question[] = [
     short: "知识竞赛得分不低于79分",
     stem: (
       <>
-        某次知识竞赛共 20 题，答对一题得 5 分，答错或不答扣 2 分。小明要得分不低于 79
+        某次知识竞赛共 20 题��答对一题得 5 分，答错或不答扣 2 分。小明要得分不低于 79
         分，他至少要答对（　　）题。
       </>
     ),
@@ -487,6 +488,7 @@ const premiumData: ResItem[] = [
 const qTypeFilters: ("全部" | QType)[] = ["全部", "单选", "多选", "填空", "判断", "主观"]
 const sourceFilters: ("全部" | Level)[] = ["全部", "市", "区", "校", "我"]
 const diffFilters: ("全部" | Difficulty)[] = ["全部", "易", "中", "难"]
+const microCatFilters: ("全部" | MicroCategory)[] = ["全部", "同步讲解", "专题突破", "复习巩固", "考点精析", "其他"]
 
 const resourceTypes = [
   { key: "题目", icon: FileText },
@@ -958,22 +960,82 @@ function MicroCard({ item, onPreview }: { item: ResItem; onPreview: () => void }
       </button>
 
       {/* 信息 */}
-      <div className="flex flex-1 flex-col p-3">
-        <h3 className="line-clamp-2 text-[14px] font-semibold leading-snug text-foreground">{item.title}</h3>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+      <div className="flex flex-1 flex-col p-2.5">
+        <h3 className="line-clamp-2 text-[13px] font-semibold leading-snug text-foreground">{item.title}</h3>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-muted-foreground">
           <span className="inline-flex items-center gap-1">
             <User className="size-3 text-muted-foreground/70" />
             {item.author}
           </span>
-          <span>{item.uploadedAt}</span>
+          <span>预览 {item.previewCount}</span>
+          <span>使用 {item.useCount}</span>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-muted-foreground">
-          <span>预览：<span className="font-medium text-foreground">{item.previewCount}</span></span>
-          <span>使用：<span className="font-medium text-foreground">{item.useCount}</span></span>
-        </div>
-        <div className="mt-3 border-t border-dashed border-border pt-2.5">
+        <div className="mt-2 border-t border-dashed border-border pt-2">
           <ResourceActions onPreview={onPreview} compact />
         </div>
+      </div>
+    </article>
+  )
+}
+
+/* 微课：列表行视图 */
+function MicroRow({ item, onPreview }: { item: ResItem; onPreview: () => void }) {
+  return (
+    <article className="flex items-center gap-4 rounded-xl border border-border bg-card p-3 transition hover:border-brand/40 hover:shadow-sm">
+      {/* 缩略图 */}
+      <button
+        onClick={onPreview}
+        className="group relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-muted"
+      >
+        {item.cover && (
+          <Image
+            src={item.cover || "/placeholder.svg"}
+            alt={item.title}
+            fill
+            className="object-cover transition group-hover:scale-105"
+            sizes="160px"
+          />
+        )}
+        <span className="absolute inset-0 grid place-items-center bg-foreground/0 transition group-hover:bg-foreground/20">
+          <span className="grid size-9 place-items-center rounded-full bg-card/90 text-brand opacity-0 shadow-lg transition group-hover:opacity-100">
+            <Play className="size-4 translate-x-0.5 fill-current" />
+          </span>
+        </span>
+        {item.duration && (
+          <span className="absolute bottom-1.5 right-1.5 rounded bg-foreground/75 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-background">
+            {item.duration}
+          </span>
+        )}
+      </button>
+
+      {/* 主体信息 */}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="truncate text-[15px] font-semibold text-foreground">{item.title}</h3>
+          {item.category && (
+            <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-medium", microCatStyle[item.category])}>
+              {item.category}
+            </span>
+          )}
+          <SourceBadge level={item.level} showLabel />
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <User className="size-3.5 text-muted-foreground/70" />
+            {item.author}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Calendar className="size-3.5 text-muted-foreground/70" />
+            {item.uploadedAt}
+          </span>
+          <span>预览次数：<span className="font-medium text-foreground">{item.previewCount}</span></span>
+          <span>使用次数：<span className="font-medium text-foreground">{item.useCount}</span></span>
+        </div>
+      </div>
+
+      {/* 操作 */}
+      <div className="shrink-0">
+        <ResourceActions onPreview={onPreview} compact />
       </div>
     </article>
   )
@@ -1235,6 +1297,8 @@ export function ResourceWorkbench() {
   const [qType, setQType] = useState<"全部" | QType>("全部")
   const [source, setSource] = useState<"全部" | Level>("全部")
   const [diff, setDiff] = useState<"全部" | Difficulty>("全部")
+  const [microCat, setMicroCat] = useState<"全部" | MicroCategory>("全部")
+  const [microView, setMicroView] = useState<"grid" | "list">("grid")
   const [compact, setCompact] = useState(false)
   const [moreFilters, setMoreFilters] = useState(false)
   const [selected, setSelected] = useState<string[]>(["q1"])
@@ -1269,7 +1333,11 @@ export function ResourceWorkbench() {
       : resourceType === "备课"
         ? lessonData
         : resourceType === "微课"
-          ? microData
+          ? microData.filter(
+              (m) =>
+                (source === "全部" || m.level === source) &&
+                (microCat === "全部" || m.category === microCat),
+            )
           : premiumData
 
   /* 组卷 / 生成练习��全屏接管，隐藏应用左侧导航与顶栏 */
@@ -1432,7 +1500,15 @@ export function ResourceWorkbench() {
               onChange={(v) => setSource(v as typeof source)}
               renderItem={(it) => (it === "全部" ? "全部" : `${it}级`.replace("我级", "我的"))}
             />
-            {resourceType !== "作业" && (
+            {resourceType === "微课" && (
+              <FilterGroup
+                label="类型"
+                items={microCatFilters}
+                active={microCat}
+                onChange={(v) => setMicroCat(v as typeof microCat)}
+              />
+            )}
+            {resourceType !== "作业" && resourceType !== "微课" && (
               <button
                 onClick={() => setMoreFilters((v) => !v)}
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition hover:text-foreground"
@@ -1474,10 +1550,34 @@ export function ResourceWorkbench() {
                   </button>
                 </div>
               )}
+              {resourceType === "微课" && (
+                <div className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
+                  <button
+                    onClick={() => setMicroView("grid")}
+                    className={cn(
+                      "rounded-md p-1.5 transition",
+                      microView === "grid" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+                    )}
+                    aria-label="网格视图"
+                  >
+                    <LayoutGrid className="size-4" />
+                  </button>
+                  <button
+                    onClick={() => setMicroView("list")}
+                    className={cn(
+                      "rounded-md p-1.5 transition",
+                      microView === "list" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+                    )}
+                    aria-label="列表视图"
+                  >
+                    <Rows3 className="size-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {moreFilters && resourceType !== "作业" && (
+          {moreFilters && resourceType !== "作业" && resourceType !== "微课" && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-2.5">
               {isQuestion && (
                 <FilterGroup
@@ -1518,11 +1618,19 @@ export function ResourceWorkbench() {
               )}
             </div>
           ) : resourceType === "微课" ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {otherData.map((item) => (
-                <MicroCard key={item.id} item={item} onPreview={() => {}} />
-              ))}
-            </div>
+            microView === "grid" ? (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                {otherData.map((item) => (
+                  <MicroCard key={item.id} item={item} onPreview={() => {}} />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {otherData.map((item) => (
+                  <MicroRow key={item.id} item={item} onPreview={() => {}} />
+                ))}
+              </div>
+            )
           ) : (
             <div className="flex flex-col gap-3">
               {resourceType === "作业"
