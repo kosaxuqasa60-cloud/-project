@@ -22,6 +22,14 @@ import {
   Clapperboard,
   Eye,
   ChevronLeft,
+  MoreHorizontal,
+  Pencil,
+  Copy,
+  Share2,
+  ClipboardCheck,
+  Calendar,
+  User,
+  FolderTree,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ChapterSidebar } from "@/components/chapter-sidebar"
@@ -263,6 +271,7 @@ export const questions: Question[] = [
 ]
 
 /* 其他资源类型数据 */
+type ResSource = "组卷" | "上传" | "共享"
 type ResItem = {
   id: string
   title: string
@@ -274,6 +283,11 @@ type ResItem = {
   /* 试卷/资源包内题目（预览二级页用） */
   qIds?: string[]
   videoCount?: number
+  /* 作业列表展示字段 */
+  source?: ResSource
+  chapter?: string
+  creator?: string
+  createdAt?: string
 }
 
 const homeworkData: ResItem[] = [
@@ -285,6 +299,10 @@ const homeworkData: ResItem[] = [
     tags: ["单元复习", "分层练习", "点阵笔适配"],
     action: "布置作业",
     qIds: ["q1", "q2", "q3", "q4", "q5"],
+    source: "组卷",
+    chapter: "第15章 一元一次不等式",
+    creator: "张伟",
+    createdAt: "2026-06-28",
   },
   {
     id: "hw2",
@@ -294,6 +312,10 @@ const homeworkData: ResItem[] = [
     tags: ["课后巩固", "易错训练"],
     action: "布置作业",
     qIds: ["q2", "q3", "q1"],
+    source: "上传",
+    chapter: "15.2 一元一次不等式组",
+    creator: "李娜",
+    createdAt: "2026-07-02",
   },
   {
     id: "hw3",
@@ -304,6 +326,10 @@ const homeworkData: ResItem[] = [
     action: "布置作业",
     hasVideo: true,
     qIds: ["q4", "q5", "q2", "q1"],
+    source: "共享",
+    chapter: "第15章 一元一次不等式",
+    creator: "教研组",
+    createdAt: "2026-05-19",
   },
 ]
 
@@ -535,65 +561,80 @@ function QuestionCard({
 
         {/* 展开详情：Tab 切换 */}
         {open && (
-          <div className="mt-3 rounded-lg border border-border">
-            <div className="flex items-center gap-1 border-b border-border px-2 pt-2">
-              {[
-                { key: "info" as const, label: "基本信息" },
-                { key: "tags" as const, label: "系统标注" },
-              ].map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
-                  className={cn(
-                    "rounded-t-md px-3 py-1.5 text-xs font-medium transition",
-                    tab === t.key
-                      ? "bg-brand-soft text-brand-soft-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {tab === "info" ? (
-              <div className="space-y-3 p-3 text-sm leading-7">
-                <div className="flex gap-2">
-                  <span className="shrink-0 font-medium text-brand">【答案】</span>
-                  <div>{q.answer}</div>
-                </div>
-                <div className="flex gap-2 text-muted-foreground">
-                  <span className="shrink-0 font-medium text-foreground">【解析】</span>
-                  <div>{q.analysis}</div>
-                </div>
-                {/* 讲解视频 */}
-                <div className="flex items-center gap-3 rounded-lg bg-muted/60 p-2.5">
-                  <div className="grid size-9 shrink-0 place-items-center rounded-md bg-brand text-brand-foreground">
-                    <PlayCircle className="size-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-medium text-foreground">
-                      {q.videoTitle}
-                    </p>
-                    <p className="text-xs text-muted-foreground">讲解视频 · {q.videoDuration}</p>
-                  </div>
-                  <button className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-brand transition hover:bg-brand-soft">
-                    播放
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3 p-3 text-sm">
-                <TagDimension label="知识点" items={q.knowledge} tone="brand" />
-                <TagDimension label="核心素养" items={q.literacy} tone="accent" />
-                <TagDimension label="认知层级" items={[q.cognitive]} tone="muted" />
-                <TagDimension label="教学标签" items={q.tags} tone="muted" />
-              </div>
-            )}
+          <div className="mt-3">
+            <QuestionDetailPanel q={q} tab={tab} onTab={setTab} />
           </div>
         )}
       </div>
     </article>
+  )
+}
+
+/* 单题详情面板（基本信息 / 系统标注），题库与作业预览共用 */
+function QuestionDetailPanel({
+  q,
+  tab,
+  onTab,
+}: {
+  q: Question
+  tab: "info" | "tags"
+  onTab: (t: "info" | "tags") => void
+}) {
+  return (
+    <div className="rounded-lg border border-border">
+      <div className="flex items-center gap-1 border-b border-border px-2 pt-2">
+        {[
+          { key: "info" as const, label: "基本信息" },
+          { key: "tags" as const, label: "系统标注" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => onTab(t.key)}
+            className={cn(
+              "rounded-t-md px-3 py-1.5 text-xs font-medium transition",
+              tab === t.key
+                ? "bg-brand-soft text-brand-soft-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "info" ? (
+        <div className="space-y-3 p-3 text-sm leading-7">
+          <div className="flex gap-2">
+            <span className="shrink-0 font-medium text-brand">【答案】</span>
+            <div>{q.answer}</div>
+          </div>
+          <div className="flex gap-2 text-muted-foreground">
+            <span className="shrink-0 font-medium text-foreground">【解析】</span>
+            <div>{q.analysis}</div>
+          </div>
+          {/* 讲解视频 */}
+          <div className="flex items-center gap-3 rounded-lg bg-muted/60 p-2.5">
+            <div className="grid size-9 shrink-0 place-items-center rounded-md bg-brand text-brand-foreground">
+              <PlayCircle className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-medium text-foreground">{q.videoTitle}</p>
+              <p className="text-xs text-muted-foreground">讲解视频 · {q.videoDuration}</p>
+            </div>
+            <button className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-brand transition hover:bg-brand-soft">
+              播放
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3 p-3 text-sm">
+          <TagDimension label="知识点" items={q.knowledge} tone="brand" />
+          <TagDimension label="核心素养" items={q.literacy} tone="accent" />
+          <TagDimension label="认知层级" items={[q.cognitive]} tone="muted" />
+          <TagDimension label="教学标签" items={q.tags} tone="muted" />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -623,6 +664,111 @@ function TagDimension({
         ))}
       </div>
     </div>
+  )
+}
+
+/* ---------------------------- 作业卡片 ---------------------------- */
+
+const sourceStyle: Record<ResSource, string> = {
+  组卷: "bg-brand-soft text-brand-soft-foreground",
+  上传: "bg-accent text-accent-foreground",
+  共享: "bg-warn/20 text-warn-foreground",
+}
+
+function HomeworkCard({ item, onPreview }: { item: ResItem; onPreview: () => void }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const qCount = item.qIds?.length ?? 0
+
+  const metaItems: { icon: typeof User; label: string; value: string }[] = [
+    { icon: Layers, label: "题目数量", value: `${qCount} 题` },
+    { icon: FolderTree, label: "所属章节", value: item.chapter ?? "—" },
+    { icon: User, label: "创作者", value: item.creator ?? "—" },
+    { icon: Calendar, label: "创建时间", value: item.createdAt ?? "—" },
+  ]
+
+  const menu: { icon: typeof Trash2; label: string; danger?: boolean }[] = [
+    { icon: Copy, label: "复制" },
+    { icon: Share2, label: "共享" },
+    { icon: ClipboardCheck, label: "评分标准绑定" },
+    { icon: Trash2, label: "删除", danger: true },
+  ]
+
+  return (
+    <article className="rounded-xl border border-border bg-card p-4 transition hover:border-brand/40 hover:shadow-sm sm:p-5">
+      {/* 标题 + 级别 + 来源 */}
+      <div className="flex items-start gap-2">
+        <h3 className="min-w-0 flex-1 text-[15px] font-semibold text-foreground">{item.title}</h3>
+        {item.source && (
+          <span className={cn("shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium", sourceStyle[item.source])}>
+            {item.source}
+          </span>
+        )}
+      </div>
+
+      {/* 元信息：级别 / 题目数量 / 所属章节 / 创作者 / 创建时间 */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1">
+          <SourceBadge level={item.level} showLabel />
+        </span>
+        {metaItems.map((m) => (
+          <span key={m.label} className="inline-flex items-center gap-1">
+            <m.icon className="size-3.5 text-muted-foreground/70" />
+            <span className="text-muted-foreground/70">{m.label}</span>
+            <span className="font-medium text-foreground">{m.value}</span>
+          </span>
+        ))}
+      </div>
+
+      <div className="my-3 border-t border-dashed border-border" />
+
+      {/* 操作：预览 / 布置 / 编辑 / 更多 */}
+      <div className="flex items-center justify-end gap-2">
+        <button
+          onClick={onPreview}
+          className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-brand/40 hover:text-foreground"
+        >
+          <Eye className="size-3.5" />
+          预览
+        </button>
+        <button className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-brand/40 hover:text-foreground">
+          <Pencil className="size-3.5" />
+          编辑
+        </button>
+        <button className="inline-flex items-center gap-1 rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition hover:opacity-90">
+          <ClipboardList className="size-3.5" />
+          布置
+        </button>
+        <div className="relative">
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="更多操作"
+            className="inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:border-brand/40 hover:text-foreground"
+          >
+            <MoreHorizontal className="size-4" />
+          </button>
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-full z-30 mt-1 w-40 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg">
+                {menu.map((m) => (
+                  <button
+                    key={m.label}
+                    onClick={() => setMenuOpen(false)}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-3 py-2 text-xs font-medium transition hover:bg-muted",
+                      m.danger ? "text-destructive hover:bg-destructive/10" : "text-foreground",
+                    )}
+                  >
+                    <m.icon className="size-3.5" />
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </article>
   )
 }
 
@@ -700,10 +846,14 @@ function ResourceCard({
 function PaperDetail({
   paper,
   premium,
+  selected,
+  onToggle,
   onBack,
 }: {
   paper: ResItem
   premium?: boolean
+  selected: string[]
+  onToggle: (id: string) => void
   onBack: () => void
 }) {
   const papered = (paper.qIds ?? []).map((id) => questions.find((q) => q.id === id)!).filter(Boolean)
@@ -776,48 +926,13 @@ function PaperDetail({
               </h2>
               <div className="flex flex-col gap-3">
                 {g.items.map((q, i) => (
-                  <article key={q.id} className="rounded-xl border border-border bg-card p-4 sm:p-5">
-                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-                      <span className="font-semibold text-muted-foreground">{i + 1}</span>
-                      <SourceBadge level={q.level} />
-                      <span className={cn("rounded px-1.5 py-0.5 font-medium", diffStyle[q.difficulty])}>
-                        {q.difficulty}
-                      </span>
-                      <span className="inline-flex items-center gap-0.5 rounded bg-warn/20 px-1.5 py-0.5 font-medium text-warn-foreground">
-                        <PlayCircle className="size-3" />
-                        视频讲解
-                      </span>
-                    </div>
-                    <div className="text-[15px] leading-7 text-foreground">{q.stem}</div>
-                    {q.options && (
-                      <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-                        {q.options.map((o) => (
-                          <div key={o.key} className="flex items-baseline gap-2 text-sm text-foreground">
-                            <span className="font-medium text-muted-foreground">{o.key}.</span>
-                            <span>{o.content}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="my-3 border-t border-dashed border-border" />
-                    <div className="flex items-start gap-2 text-sm leading-7">
-                      <span className="shrink-0 font-medium text-brand">【答案】</span>
-                      <div>{q.answer}</div>
-                    </div>
-                    {/* 讲解视频 */}
-                    <div className="mt-3 flex items-center gap-3 rounded-lg bg-muted/60 p-2.5">
-                      <div className="grid size-9 shrink-0 place-items-center rounded-md bg-brand text-brand-foreground">
-                        <PlayCircle className="size-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-medium text-foreground">{q.videoTitle}</p>
-                        <p className="text-xs text-muted-foreground">讲解视频 · {q.videoDuration}</p>
-                      </div>
-                      <button className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-brand transition hover:bg-brand-soft">
-                        播放
-                      </button>
-                    </div>
-                  </article>
+                  <PaperQuestionCard
+                    key={q.id}
+                    q={q}
+                    index={i + 1}
+                    selected={selected.includes(q.id)}
+                    onToggle={() => onToggle(q.id)}
+                  />
                 ))}
               </div>
             </section>
@@ -825,6 +940,84 @@ function PaperDetail({
         </div>
       </div>
     </div>
+  )
+}
+
+/* 试卷预览中的单题卡：题干可直接看，展开后与题库单题一致（基本信息 / 系统标注），并可加入题篮 */
+function PaperQuestionCard({
+  q,
+  index,
+  selected,
+  onToggle,
+}: {
+  q: Question
+  index: number
+  selected: boolean
+  onToggle: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<"info" | "tags">("info")
+
+  return (
+    <article
+      className={cn(
+        "rounded-xl border bg-card p-4 transition sm:p-5",
+        selected ? "border-brand ring-1 ring-brand/30" : "border-border",
+      )}
+    >
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-semibold text-muted-foreground">{index}</span>
+        <span className="rounded bg-brand-soft px-1.5 py-0.5 font-medium text-brand-soft-foreground">{q.qType}</span>
+        <SourceBadge level={q.level} />
+        <span className={cn("rounded px-1.5 py-0.5 font-medium", diffStyle[q.difficulty])}>{q.difficulty}</span>
+        <span className="inline-flex items-center gap-0.5 rounded bg-warn/20 px-1.5 py-0.5 font-medium text-warn-foreground">
+          <PlayCircle className="size-3" />
+          视频讲解
+        </span>
+      </div>
+
+      <div className="text-[15px] leading-7 text-foreground">{q.stem}</div>
+      {q.options && (
+        <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+          {q.options.map((o) => (
+            <div key={o.key} className="flex items-baseline gap-2 text-sm text-foreground">
+              <span className="font-medium text-muted-foreground">{o.key}.</span>
+              <span>{o.content}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="my-3 border-t border-dashed border-border" />
+
+      <div className="flex items-center justify-end gap-2">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-brand/40 hover:text-foreground"
+        >
+          <ChevronDown className={cn("size-3.5 transition", open && "rotate-180")} />
+          展开详情
+        </button>
+        <button
+          onClick={onToggle}
+          className={cn(
+            "inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition",
+            selected
+              ? "border border-border bg-card text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+              : "bg-brand text-brand-foreground hover:opacity-90",
+          )}
+        >
+          {selected ? <X className="size-3.5" strokeWidth={2.5} /> : <ShoppingCart className="size-3.5" />}
+          {selected ? "移出" : "加入"}
+        </button>
+      </div>
+
+      {open && (
+        <div className="mt-3">
+          <QuestionDetailPanel q={q} tab={tab} onTab={setTab} />
+        </div>
+      )}
+    </article>
   )
 }
 
@@ -871,7 +1064,7 @@ export function ResourceWorkbench() {
           ? microData
           : premiumData
 
-  /* 组卷 / 生成练习：全屏接管，隐藏应用左侧导航与顶栏 */
+  /* 组卷 / 生成练习��全屏接管，隐藏应用左侧导航与顶栏 */
   if (composing) {
     return (
       <div className="fixed inset-0 z-50 bg-background">
@@ -902,6 +1095,8 @@ export function ResourceWorkbench() {
           <PaperDetail
             paper={previewPaper}
             premium={isPremium}
+            selected={selected}
+            onToggle={toggle}
             onBack={() => setPreviewPaper(null)}
           />
         ) : (
@@ -1064,15 +1259,19 @@ export function ResourceWorkbench() {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {otherData.map((item) => (
-                <ResourceCard
-                  key={item.id}
-                  item={item}
-                  premium={isPremium}
-                  canPreview={resourceType === "作业" || isPremium}
-                  onPreview={() => setPreviewPaper(item)}
-                />
-              ))}
+              {resourceType === "作业"
+                ? otherData.map((item) => (
+                    <HomeworkCard key={item.id} item={item} onPreview={() => setPreviewPaper(item)} />
+                  ))
+                : otherData.map((item) => (
+                    <ResourceCard
+                      key={item.id}
+                      item={item}
+                      premium={isPremium}
+                      canPreview={isPremium}
+                      onPreview={() => setPreviewPaper(item)}
+                    />
+                  ))}
             </div>
           )}
         </div>
