@@ -82,7 +82,6 @@ export function DotPenLayout({
   const [tab, setTab] = useState<"byQ" | "byLevel">("byQ")
   const [selected, setSelected] = useState<string | null>(null)
   const [configFor, setConfigFor] = useState<string | null>(null)
-  const [checked, setChecked] = useState<Set<string>>(new Set())
   const [batchOpen, setBatchOpen] = useState(false)
   const [curPage, setCurPage] = useState(1)
   const [zoom, setZoom] = useState(100)
@@ -400,10 +399,7 @@ export function DotPenLayout({
               <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
                 <span className="text-sm font-semibold text-foreground">题目</span>
                 <button
-                  onClick={() => {
-                    setChecked(new Set(flat.map((f) => f.q.id)))
-                    setBatchOpen(true)
-                  }}
+                  onClick={() => setBatchOpen(true)}
                   className="inline-flex items-center gap-1 text-xs font-medium text-brand transition hover:opacity-80"
                 >
                   批量设置
@@ -458,76 +454,7 @@ export function DotPenLayout({
               </div>
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex items-center justify-between border-b border-border px-3 py-2">
-                <span className="text-xs text-muted-foreground">
-                  已选 <span className="font-semibold text-foreground">{checked.size}</span> 题
-                </span>
-                <button
-                  onClick={() => setBatchOpen(true)}
-                  disabled={checked.size === 0}
-                  className="inline-flex items-center gap-1 rounded-md bg-brand px-2.5 py-1.5 text-xs font-medium text-brand-foreground transition hover:opacity-90 disabled:opacity-40"
-                >
-                  <Settings2 className="size-3.5" />
-                  批量设置
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-3">
-                <div className="flex flex-col gap-3">
-                  {sections.map((sec, si) => {
-                    const ids = sec.items.map((it) => it.q.id)
-                    const allOn = ids.length > 0 && ids.every((id) => checked.has(id))
-                    return (
-                      <div key={sec.id}>
-                        <label className="mb-1 flex items-center gap-2 text-[13px] font-bold text-foreground">
-                          <input
-                            type="checkbox"
-                            checked={allOn}
-                            onChange={() =>
-                              setChecked((prev) => {
-                                const next = new Set(prev)
-                                if (allOn) ids.forEach((id) => next.delete(id))
-                                else ids.forEach((id) => next.add(id))
-                                return next
-                              })
-                            }
-                            className="size-3.5 accent-[oklch(0.58_0.1_158)]"
-                          />
-                          {CN_NUM[si]}、{sec.title}
-                          <span className="text-[11px] font-normal text-muted-foreground">
-                            {ids.length} 小题
-                          </span>
-                        </label>
-                        <div className="flex flex-col gap-1 pl-5">
-                          {sec.items.map((it, i) => (
-                            <label
-                              key={it.q.id}
-                              className="flex items-center gap-2 rounded-md px-1.5 py-1 text-xs text-foreground hover:bg-muted"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked.has(it.q.id)}
-                                onChange={() =>
-                                  setChecked((prev) => {
-                                    const next = new Set(prev)
-                                    next.has(it.q.id) ? next.delete(it.q.id) : next.add(it.q.id)
-                                    return next
-                                  })
-                                }
-                                className="size-3.5 accent-[oklch(0.58_0.1_158)]"
-                              />
-                              <span className="text-muted-foreground">{i + 1}.</span>
-                              <span className="line-clamp-1 flex-1">{it.q.short}</span>
-                              <StatusIcon status={statusOf(it.q.id)} />
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
+            <LevelTree sections={sections} scores={scores} onBatch={() => setBatchOpen(true)} />
           )}
         </aside>
       </div>
@@ -550,7 +477,6 @@ export function DotPenLayout({
         <BatchModal
           sections={sections}
           scores={scores}
-          checkedIds={checked}
           pages={pages.length}
           onClose={() => setBatchOpen(false)}
           onApply={(map) => {
@@ -687,7 +613,7 @@ function PaperSheet({
                   {/* 题目区 */}
                   <div
                     className={cn(
-                      "relative rounded-sm p-1",
+                      "group/box relative rounded-sm p-1",
                       showQ ? "outline outline-1 outline-sky-400 bg-sky-400/5" : "",
                       tool && tool !== "作答框" && "cursor-pointer",
                     )}
@@ -699,6 +625,18 @@ function PaperSheet({
                     }}
                   >
                     {showQ && <FrameTag className="bg-sky-500" label={`题目区 ${it.gi}`} />}
+                    {showQ && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onToggleBox(it.q.id, "q")
+                        }}
+                        className="absolute -right-2 -top-2 z-10 grid size-4 place-items-center rounded-full bg-destructive text-white opacity-0 shadow transition group-hover/box:opacity-100"
+                        aria-label="删除题目框"
+                      >
+                        <X className="size-2.5" />
+                      </button>
+                    )}
                     {showQ && note.tone !== "green" && (
                       <span className="absolute right-1 top-1 rounded bg-warn px-1.5 py-0.5 text-[9px] font-medium text-warn-foreground">
                         {note.label}
@@ -722,7 +660,7 @@ function PaperSheet({
                   {/* 作答区 */}
                   <div
                     className={cn(
-                      "relative mt-1 rounded-sm",
+                      "group/abox relative mt-1 rounded-sm",
                       showA
                         ? "outline outline-1 outline-[oklch(0.58_0.1_158)] bg-brand/5"
                         : "border border-dashed border-neutral-300",
@@ -737,7 +675,19 @@ function PaperSheet({
                     }}
                   >
                     {showA && <FrameTag className="bg-[oklch(0.58_0.1_158)]" label={`作答区 ${it.gi}`} />}
-                    <span className="absolute left-1 top-0.5 text-[9px] text-neutral-400">作答区</span>
+                    {showA && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onToggleBox(it.q.id, "a")
+                        }}
+                        className="absolute -right-2 -top-2 z-10 grid size-4 place-items-center rounded-full bg-destructive text-white opacity-0 shadow transition group-hover/abox:opacity-100"
+                        aria-label="删除作答框"
+                      >
+                        <X className="size-2.5" />
+                      </button>
+                    )}
+                    {!showA && <span className="absolute left-1 top-0.5 text-[9px] text-neutral-400">作答区</span>}
                   </div>
                 </div>
               )
@@ -982,6 +932,192 @@ function AnswerConfig({
 
 /* ---------------------------- 批量设置 ---------------------------- */
 
+/* ------------------------- 按层级查看：题目层级（支持合并 / 拆分） ------------------------- */
+
+type Origin = { q: Question; score: number }
+type LSub = { id: string; origins: Origin[] }
+type LBig = { id: string; title: string; open: boolean; subs: LSub[] }
+
+const hasAnswerBadge = (t: QType) => t === "单选" || t === "多选" || t === "判断"
+
+function LevelTree({
+  sections,
+  scores,
+  onBatch,
+}: {
+  sections: LaidSection[]
+  scores: Record<string, number>
+  onBatch: () => void
+}) {
+  const [bigs, setBigs] = useState<LBig[]>(() =>
+    sections.map((sec) => ({
+      id: sec.id,
+      title: sec.title,
+      open: true,
+      subs: sec.items.map((it) => ({
+        id: it.q.id,
+        origins: [{ q: it.q, score: scores[it.q.id] ?? it.score }],
+      })),
+    })),
+  )
+
+  const subScore = (s: LSub) => s.origins.reduce((sum, o) => sum + o.score, 0)
+  const totalScore = bigs.reduce((t, b) => t + b.subs.reduce((s, sub) => s + subScore(sub), 0), 0)
+  const subCount = bigs.reduce((n, b) => n + b.subs.length, 0)
+
+  const patchBig = (bid: string, fn: (b: LBig) => LBig) =>
+    setBigs((prev) => prev.map((b) => (b.id === bid ? fn(b) : b)))
+
+  /* 小题：与下一小题合并 */
+  const mergeSub = (bid: string, idx: number) =>
+    patchBig(bid, (b) => {
+      if (idx >= b.subs.length - 1) return b
+      const next = b.subs[idx + 1]
+      const merged: LSub = { ...b.subs[idx], origins: [...b.subs[idx].origins, ...next.origins] }
+      const subs = [...b.subs.slice(0, idx), merged, ...b.subs.slice(idx + 2)]
+      return { ...b, subs }
+    })
+  /* 小题：拆分为独立小题 */
+  const splitSub = (bid: string, idx: number) =>
+    patchBig(bid, (b) => {
+      const sub = b.subs[idx]
+      if (sub.origins.length < 2) return b
+      const parts: LSub[] = sub.origins.map((o, k) => ({ id: `${sub.id}-s${k}`, origins: [o] }))
+      return { ...b, subs: [...b.subs.slice(0, idx), ...parts, ...b.subs.slice(idx + 1)] }
+    })
+  /* 大题：与下一大题合并 */
+  const mergeBig = (idx: number) =>
+    setBigs((prev) => {
+      if (idx >= prev.length - 1) return prev
+      const merged: LBig = { ...prev[idx], subs: [...prev[idx].subs, ...prev[idx + 1].subs] }
+      return [...prev.slice(0, idx), merged, ...prev.slice(idx + 2)]
+    })
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* 头 */}
+      <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+        <span className="text-sm font-bold text-foreground">题目层级</span>
+        <button onClick={onBatch} className="text-xs font-medium text-brand transition hover:opacity-80">
+          批量设置
+        </button>
+      </div>
+      {/* 统计 */}
+      <div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs text-muted-foreground">
+        <span>
+          总分：<span className="font-semibold text-foreground">{totalScore.toFixed(1)}</span> 分
+        </span>
+        <span>
+          大题数 <span className="font-semibold text-foreground">{bigs.length}</span>
+          <span className="mx-1.5">·</span>
+          小题数 <span className="font-semibold text-foreground">{subCount}</span>
+        </span>
+      </div>
+
+      {/* 树 */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+        {bigs.map((big, bi) => {
+          const canMergeBig = bi < bigs.length - 1
+          return (
+            <div key={big.id} className="mb-1">
+              {/* 大题行 */}
+              <div className="flex items-center gap-2 rounded-md bg-secondary/40 px-2 py-1.5">
+                <CircleAction
+                  kind={canMergeBig ? "merge" : "none"}
+                  onClick={() => canMergeBig && mergeBig(bi)}
+                  title={canMergeBig ? "与下一大题合并" : "无可合并大题"}
+                />
+                <span className="flex-1 text-[13px] font-bold text-foreground">
+                  {CN_NUM[bi]}、{big.title}
+                </span>
+                <button
+                  onClick={() => patchBig(big.id, (b) => ({ ...b, open: !b.open }))}
+                  className="grid size-5 place-items-center rounded text-muted-foreground transition hover:bg-muted"
+                  aria-label={big.open ? "收起" : "展开"}
+                >
+                  {big.open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                </button>
+              </div>
+
+              {/* 小题 */}
+              {big.open && (
+                <div className="ml-3 border-l border-border pl-2">
+                  {big.subs.map((sub, si) => {
+                    const t = sub.origins[0].q.qType
+                    const canSplit = sub.origins.length > 1
+                    const canMerge = si < big.subs.length - 1
+                    return (
+                      <div key={sub.id} className="py-1">
+                        {/* 小题行 */}
+                        <div className="flex items-center gap-2">
+                          <CircleAction
+                            kind={canSplit ? "split" : canMerge ? "merge" : "none"}
+                            onClick={() => (canSplit ? splitSub(big.id, si) : canMerge ? mergeSub(big.id, si) : undefined)}
+                            title={canSplit ? "拆分小题" : canMerge ? "与下一小题合并" : "无可合并小题"}
+                          />
+                          <span className="text-[13px] font-medium text-foreground">小题{si + 1}</span>
+                          <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                            题号 {CN_NUM[bi]}·{si + 1}
+                          </span>
+                          <span className="rounded border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                            {qTypeFull(t)}
+                          </span>
+                        </div>
+                        {/* 作答区 */}
+                        <div className="ml-6 mt-1 flex flex-col gap-1">
+                          {sub.origins.map((o, ri) => (
+                            <div key={ri} className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                              <SquareDashed className="size-3.5" />
+                              <span>作答区 {ri + 1}</span>
+                              {hasAnswerBadge(o.q.qType) && (
+                                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-foreground">{o.q.answer}</span>
+                              )}
+                              <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-foreground">
+                                {o.score}分
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function CircleAction({
+  kind,
+  onClick,
+  title,
+}: {
+  kind: "merge" | "split" | "none"
+  onClick: () => void
+  title: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      disabled={kind === "none"}
+      className={cn(
+        "grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-bold transition",
+        kind === "merge" && "bg-brand text-brand-foreground hover:opacity-85",
+        kind === "split" && "bg-warn text-warn-foreground hover:opacity-85",
+        kind === "none" && "cursor-default bg-muted text-muted-foreground",
+      )}
+      aria-label={title}
+    >
+      {kind === "merge" ? "合" : kind === "split" ? "拆" : <Minus className="size-3" />}
+    </button>
+  )
+}
+
 const QTYPE_OPTIONS: QType[] = ["单选", "多选", "填空", "判断", "主观"]
 const regionCountOf = (t: QType) => (t === "填空" ? 4 : t === "主观" ? 1 : 1)
 
@@ -991,14 +1127,12 @@ type BSection = { id: string; title: string; open: boolean; items: BItem[] }
 function BatchModal({
   sections,
   scores,
-  checkedIds,
   pages,
   onClose,
   onApply,
 }: {
   sections: LaidSection[]
   scores: Record<string, number>
-  checkedIds: Set<string>
   pages: number
   onClose: () => void
   onApply: (map: Record<string, number>) => void
@@ -1007,7 +1141,6 @@ function BatchModal({
     sections
       .map((sec, si) => {
         const items = sec.items
-          .filter((it) => checkedIds.has(it.q.id))
           .map((it, idx) => {
             const rc = regionCountOf(it.q.qType)
             const per = Math.max(1, Math.round((scores[it.q.id] ?? it.score) / rc))
