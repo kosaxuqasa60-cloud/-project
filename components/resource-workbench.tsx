@@ -9,6 +9,7 @@ import {
   ShoppingCart,
   Rows3,
   StretchHorizontal,
+  LayoutGrid,
   PlayCircle,
   FileText,
   PanelLeftClose,
@@ -22,19 +23,34 @@ import {
   Clapperboard,
   Eye,
   ChevronLeft,
+  MoreHorizontal,
+  Pencil,
+  Copy,
+  Share2,
+  ClipboardCheck,
+  Calendar,
+  User,
+  FolderTree,
+  Download,
+  Upload,
+  Presentation,
+  FileType2,
+  Play,
 } from "lucide-react"
+import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { ChapterSidebar } from "@/components/chapter-sidebar"
 import { SourceBadge, type Level } from "@/components/source-badge"
 import { Math } from "@/components/math"
 import { TextbookSwitcher } from "@/components/textbook-switcher"
+import { ExerciseComposer } from "@/components/exercise-composer"
 
 /* ---------------------------- 数据 ---------------------------- */
 
-type QType = "单选" | "多选" | "填空" | "判断" | "主观"
-type Difficulty = "易" | "中" | "难"
+export type QType = "单选" | "多选" | "填空" | "判断" | "主观"
+export type Difficulty = "易" | "中" | "难"
 
-type Question = {
+export type Question = {
   id: string
   qType: QType
   level: Level
@@ -57,7 +73,7 @@ type Question = {
   editable?: boolean
 }
 
-const questions: Question[] = [
+export const questions: Question[] = [
   {
     id: "q1",
     qType: "单选",
@@ -229,14 +245,14 @@ const questions: Question[] = [
     level: "我",
     difficulty: "中",
     group: "第15章 一元一次不等式 · 综合提升",
-    knowledge: ["一元一次不等式", "实际应用"],
+    knowledge: ["一元一次不���式", "实际应用"],
     literacy: ["数学建模", "数学运算"],
     cognitive: "应用",
     tags: ["情景应用", "校本改编"],
     short: "知识竞赛得分不低于79分",
     stem: (
       <>
-        某次知识竞赛共 20 题，答对一题得 5 分，答错或不答扣 2 分。小明要得分不低于 79
+        某次知识竞赛共 20 题��答对一题得 5 分，答错或不答扣 2 分。小明要得分不低于 79
         分，他至少要答对（　　）题。
       </>
     ),
@@ -262,6 +278,9 @@ const questions: Question[] = [
 ]
 
 /* 其他资源类型数据 */
+type ResSource = "组卷" | "上传" | "共享"
+type FileKind = "PPT" | "Word" | "PDF" | "Excel"
+type MicroCategory = "同步讲解" | "专题突破" | "复习巩固" | "考点精析" | "其他"
 type ResItem = {
   id: string
   title: string
@@ -273,6 +292,22 @@ type ResItem = {
   /* 试卷/资源包内题目（预览二级页用） */
   qIds?: string[]
   videoCount?: number
+  /* 作业列表展示字段 */
+  source?: ResSource
+  chapter?: string
+  creator?: string
+  createdAt?: string
+  /* 备课 / 微课 通用展示字段 */
+  author?: string
+  uploadedAt?: string
+  previewCount?: number
+  useCount?: number
+  pages?: number
+  fileKind?: FileKind
+  /* 微课字段 */
+  cover?: string
+  duration?: string
+  category?: MicroCategory
 }
 
 const homeworkData: ResItem[] = [
@@ -284,6 +319,10 @@ const homeworkData: ResItem[] = [
     tags: ["单元复习", "分层练习", "点阵笔适配"],
     action: "布置作业",
     qIds: ["q1", "q2", "q3", "q4", "q5"],
+    source: "组卷",
+    chapter: "第15章 一元一次不等式",
+    creator: "张伟",
+    createdAt: "2026-06-28",
   },
   {
     id: "hw2",
@@ -293,6 +332,10 @@ const homeworkData: ResItem[] = [
     tags: ["课后巩固", "易错训练"],
     action: "布置作业",
     qIds: ["q2", "q3", "q1"],
+    source: "上传",
+    chapter: "15.2 一元一次不等式组",
+    creator: "李娜",
+    createdAt: "2026-07-02",
   },
   {
     id: "hw3",
@@ -303,33 +346,55 @@ const homeworkData: ResItem[] = [
     action: "布置作业",
     hasVideo: true,
     qIds: ["q4", "q5", "q2", "q1"],
+    source: "共享",
+    chapter: "第15章 一元一次不等式",
+    creator: "教研组",
+    createdAt: "2026-05-19",
   },
 ]
 
 const lessonData: ResItem[] = [
   {
     id: "lp1",
-    title: "15.2 一元一次不等式组（第1课时）",
+    title: "15.2 一元一次不等式组（第1课时）.pptx",
     level: "校",
-    meta: ["PPT 课件", "24 页", "使用 56 次"],
-    tags: ["新授课", "数轴表示", "配套学案"],
-    action: "用于备课",
+    meta: [],
+    tags: [],
+    action: "",
+    fileKind: "PPT",
+    author: "张伟",
+    uploadedAt: "2026-06-28",
+    previewCount: 0,
+    useCount: 2,
+    pages: 24,
   },
   {
     id: "lp2",
-    title: "一元一次不等式组解集规律 · 教学设计",
+    title: "一元一次不等式组解集规律 · 教学设计.docx",
     level: "区",
-    meta: ["教案 / 讲义", "8 页", "使用 132 次"],
-    tags: ["规律梳理", "公开课"],
-    action: "用于备课",
+    meta: [],
+    tags: [],
+    action: "",
+    fileKind: "Word",
+    author: "李娜",
+    uploadedAt: "2026-07-02",
+    previewCount: 18,
+    useCount: 6,
+    pages: 8,
   },
   {
     id: "lp3",
-    title: "第15章 单元整体教学设计",
+    title: "第15章 单元整体教学设计.pdf",
     level: "市",
-    meta: ["教案 + PPT", "42 页", "使用 410 次"],
-    tags: ["大单元", "教学评一体化"],
-    action: "用于备课",
+    meta: [],
+    tags: [],
+    action: "",
+    fileKind: "PDF",
+    author: "教研组",
+    uploadedAt: "2026-05-19",
+    previewCount: 132,
+    useCount: 41,
+    pages: 42,
   },
 ]
 
@@ -338,28 +403,49 @@ const microData: ResItem[] = [
     id: "mc1",
     title: "一元一次不等式的解法",
     level: "市",
-    meta: ["时长 06:12", "观看 2.3k"],
-    tags: ["精讲", "解法演示"],
-    action: "预览微课",
+    meta: [],
+    tags: [],
+    action: "",
     hasVideo: true,
+    cover: "/micro/cover-1.png",
+    duration: "06:12",
+    category: "同步讲解",
+    author: "张伟",
+    uploadedAt: "2026-06-20",
+    previewCount: 0,
+    useCount: 12,
   },
   {
     id: "mc2",
     title: "数轴上表示不等式组的解集",
     level: "区",
-    meta: ["时长 08:30", "观看 1.1k"],
-    tags: ["数轴表示", "易错点"],
-    action: "预览微课",
+    meta: [],
+    tags: [],
+    action: "",
     hasVideo: true,
+    cover: "/micro/cover-2.png",
+    duration: "08:30",
+    category: "专题突破",
+    author: "李娜",
+    uploadedAt: "2026-06-24",
+    previewCount: 8,
+    useCount: 5,
   },
   {
     id: "mc3",
     title: "不等式性质常见陷阱",
     level: "校",
-    meta: ["时长 05:48", "观看 640"],
-    tags: ["概念辨析", "纠错"],
-    action: "预览微课",
+    meta: [],
+    tags: [],
+    action: "",
     hasVideo: true,
+    cover: "/micro/cover-3.png",
+    duration: "05:48",
+    category: "考点精析",
+    author: "王芳",
+    uploadedAt: "2026-06-30",
+    previewCount: 3,
+    useCount: 2,
   },
 ]
 
@@ -402,6 +488,7 @@ const premiumData: ResItem[] = [
 const qTypeFilters: ("全部" | QType)[] = ["全部", "单选", "多选", "填空", "判断", "主观"]
 const sourceFilters: ("全部" | Level)[] = ["全部", "市", "区", "校", "我"]
 const diffFilters: ("全部" | Difficulty)[] = ["全部", "易", "中", "难"]
+const microCatFilters: ("全部" | MicroCategory)[] = ["全部", "同步讲解", "专题突破", "复习巩固", "考点精析", "其他"]
 
 const resourceTypes = [
   { key: "题目", icon: FileText },
@@ -484,7 +571,7 @@ function QuestionCard({
         {/* 虚线分隔：题干 / 标签 */}
         <div className="my-3 border-t border-dashed border-border" />
 
-        {/* 标签行 + 右下角两个操作 */}
+        {/* 标��行 + 右下角两个操作 */}
         <div className="flex flex-wrap items-center gap-1.5">
           {q.knowledge.map((k) => (
             <span
@@ -534,65 +621,80 @@ function QuestionCard({
 
         {/* 展开详情：Tab 切换 */}
         {open && (
-          <div className="mt-3 rounded-lg border border-border">
-            <div className="flex items-center gap-1 border-b border-border px-2 pt-2">
-              {[
-                { key: "info" as const, label: "基本信息" },
-                { key: "tags" as const, label: "系统标注" },
-              ].map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
-                  className={cn(
-                    "rounded-t-md px-3 py-1.5 text-xs font-medium transition",
-                    tab === t.key
-                      ? "bg-brand-soft text-brand-soft-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {tab === "info" ? (
-              <div className="space-y-3 p-3 text-sm leading-7">
-                <div className="flex gap-2">
-                  <span className="shrink-0 font-medium text-brand">【答案】</span>
-                  <div>{q.answer}</div>
-                </div>
-                <div className="flex gap-2 text-muted-foreground">
-                  <span className="shrink-0 font-medium text-foreground">【解析】</span>
-                  <div>{q.analysis}</div>
-                </div>
-                {/* 讲解视频 */}
-                <div className="flex items-center gap-3 rounded-lg bg-muted/60 p-2.5">
-                  <div className="grid size-9 shrink-0 place-items-center rounded-md bg-brand text-brand-foreground">
-                    <PlayCircle className="size-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-medium text-foreground">
-                      {q.videoTitle}
-                    </p>
-                    <p className="text-xs text-muted-foreground">讲解视频 · {q.videoDuration}</p>
-                  </div>
-                  <button className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-brand transition hover:bg-brand-soft">
-                    播放
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3 p-3 text-sm">
-                <TagDimension label="知识点" items={q.knowledge} tone="brand" />
-                <TagDimension label="核心素养" items={q.literacy} tone="accent" />
-                <TagDimension label="认知层级" items={[q.cognitive]} tone="muted" />
-                <TagDimension label="教学标签" items={q.tags} tone="muted" />
-              </div>
-            )}
+          <div className="mt-3">
+            <QuestionDetailPanel q={q} tab={tab} onTab={setTab} />
           </div>
         )}
       </div>
     </article>
+  )
+}
+
+/* 单题详情面板（基本信息 / 系统标注），题库与作业预览共用 */
+function QuestionDetailPanel({
+  q,
+  tab,
+  onTab,
+}: {
+  q: Question
+  tab: "info" | "tags"
+  onTab: (t: "info" | "tags") => void
+}) {
+  return (
+    <div className="rounded-lg border border-border">
+      <div className="flex items-center gap-1 border-b border-border px-2 pt-2">
+        {[
+          { key: "info" as const, label: "基本信息" },
+          { key: "tags" as const, label: "系统标注" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => onTab(t.key)}
+            className={cn(
+              "rounded-t-md px-3 py-1.5 text-xs font-medium transition",
+              tab === t.key
+                ? "bg-brand-soft text-brand-soft-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "info" ? (
+        <div className="space-y-3 p-3 text-sm leading-7">
+          <div className="flex gap-2">
+            <span className="shrink-0 font-medium text-brand">【答案】</span>
+            <div>{q.answer}</div>
+          </div>
+          <div className="flex gap-2 text-muted-foreground">
+            <span className="shrink-0 font-medium text-foreground">【解析】</span>
+            <div>{q.analysis}</div>
+          </div>
+          {/* 讲解视频 */}
+          <div className="flex items-center gap-3 rounded-lg bg-muted/60 p-2.5">
+            <div className="grid size-9 shrink-0 place-items-center rounded-md bg-brand text-brand-foreground">
+              <PlayCircle className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-medium text-foreground">{q.videoTitle}</p>
+              <p className="text-xs text-muted-foreground">讲解视频 · {q.videoDuration}</p>
+            </div>
+            <button className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-brand transition hover:bg-brand-soft">
+              播放
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3 p-3 text-sm">
+          <TagDimension label="知识点" items={q.knowledge} tone="brand" />
+          <TagDimension label="核心素养" items={q.literacy} tone="accent" />
+          <TagDimension label="认知层级" items={[q.cognitive]} tone="muted" />
+          <TagDimension label="教学标签" items={q.tags} tone="muted" />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -622,6 +724,320 @@ function TagDimension({
         ))}
       </div>
     </div>
+  )
+}
+
+/* ---------------------------- 作业卡片 ---------------------------- */
+
+const sourceStyle: Record<ResSource, string> = {
+  组卷: "bg-brand-soft text-brand-soft-foreground",
+  上传: "bg-accent text-accent-foreground",
+  共享: "bg-warn/20 text-warn-foreground",
+}
+
+function HomeworkCard({ item, onPreview }: { item: ResItem; onPreview: () => void }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const qCount = item.qIds?.length ?? 0
+
+  const metaItems: { icon: typeof User; label: string; value: string }[] = [
+    { icon: Layers, label: "题目数量", value: `${qCount} 题` },
+    { icon: FolderTree, label: "所属章节", value: item.chapter ?? "—" },
+    { icon: User, label: "创作者", value: item.creator ?? "—" },
+    { icon: Calendar, label: "创建时间", value: item.createdAt ?? "—" },
+  ]
+
+  const menu: { icon: typeof Trash2; label: string; danger?: boolean }[] = [
+    { icon: Copy, label: "复制" },
+    { icon: Share2, label: "共享" },
+    { icon: ClipboardCheck, label: "评分标准绑定" },
+    { icon: Trash2, label: "删除", danger: true },
+  ]
+
+  return (
+    <article className="rounded-xl border border-border bg-card p-4 transition hover:border-brand/40 hover:shadow-sm sm:p-5">
+      {/* 标题 + 级别 + 来源 */}
+      <div className="flex items-start gap-2">
+        <h3 className="min-w-0 flex-1 text-[15px] font-semibold text-foreground">{item.title}</h3>
+        {item.source && (
+          <span className={cn("shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium", sourceStyle[item.source])}>
+            {item.source}
+          </span>
+        )}
+      </div>
+
+      {/* 元信息：级别 / 题目数量 / 所属章节 / 创作者 / 创建时间 */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1">
+          <SourceBadge level={item.level} showLabel />
+        </span>
+        {metaItems.map((m) => (
+          <span key={m.label} className="inline-flex items-center gap-1">
+            <m.icon className="size-3.5 text-muted-foreground/70" />
+            <span className="text-muted-foreground/70">{m.label}</span>
+            <span className="font-medium text-foreground">{m.value}</span>
+          </span>
+        ))}
+      </div>
+
+      <div className="my-3 border-t border-dashed border-border" />
+
+      {/* 操作：预览 / 布置 / 编辑 / 更多 */}
+      <div className="flex items-center justify-end gap-2">
+        <button
+          onClick={onPreview}
+          className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-brand/40 hover:text-foreground"
+        >
+          <Eye className="size-3.5" />
+          预览
+        </button>
+        <button className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-brand/40 hover:text-foreground">
+          <Pencil className="size-3.5" />
+          编辑
+        </button>
+        <button className="inline-flex items-center gap-1 rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition hover:opacity-90">
+          <ClipboardList className="size-3.5" />
+          布置
+        </button>
+        <div className="relative">
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="更多操作"
+            className="inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:border-brand/40 hover:text-foreground"
+          >
+            <MoreHorizontal className="size-4" />
+          </button>
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-full z-30 mt-1 w-40 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg">
+                {menu.map((m) => (
+                  <button
+                    key={m.label}
+                    onClick={() => setMenuOpen(false)}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-3 py-2 text-xs font-medium transition hover:bg-muted",
+                      m.danger ? "text-destructive hover:bg-destructive/10" : "text-foreground",
+                    )}
+                  >
+                    <m.icon className="size-3.5" />
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+/* ---------------------------- 备课 / 微课 通用 ---------------------------- */
+
+const fileKindStyle: Record<FileKind, { bg: string; label: string; icon: typeof FileText }> = {
+  PPT: { bg: "bg-[oklch(0.62_0.16_38)]", label: "PPT", icon: Presentation },
+  Word: { bg: "bg-[oklch(0.5_0.13_255)]", label: "DOC", icon: FileText },
+  PDF: { bg: "bg-[oklch(0.55_0.18_25)]", label: "PDF", icon: FileType2 },
+  Excel: { bg: "bg-[oklch(0.52_0.13_150)]", label: "XLS", icon: FileText },
+}
+
+const microCatStyle: Record<MicroCategory, string> = {
+  同步讲解: "bg-brand-soft text-brand-soft-foreground",
+  专题突破: "bg-accent text-accent-foreground",
+  复习巩固: "bg-warn/20 text-warn-foreground",
+  考点精析: "bg-[oklch(0.93_0.03_255)] text-[oklch(0.4_0.13_255)]",
+  其他: "bg-muted text-muted-foreground",
+}
+
+/* 共用操作：预览 / 编辑 / 下载 / 共享 / 删除 */
+function ResourceActions({ onPreview, compact }: { onPreview?: () => void; compact?: boolean }) {
+  const actions: { icon: typeof Eye; label: string; onClick?: () => void; danger?: boolean }[] = [
+    { icon: Eye, label: "预览", onClick: onPreview },
+    { icon: Pencil, label: "编辑" },
+    { icon: Download, label: "下载" },
+    { icon: Share2, label: "共享" },
+    { icon: Trash2, label: "删除", danger: true },
+  ]
+  return (
+    <div className={cn("flex items-center", compact ? "gap-1" : "gap-1.5")}>
+      {actions.map((a) => (
+        <button
+          key={a.label}
+          onClick={a.onClick}
+          title={a.label}
+          aria-label={a.label}
+          className={cn(
+            "inline-flex items-center justify-center rounded-lg border border-border transition hover:border-brand/40 hover:text-foreground",
+            compact ? "size-8" : "gap-1 px-2.5 py-1.5 text-xs font-medium",
+            a.danger ? "text-muted-foreground hover:border-destructive/40 hover:text-destructive" : "text-muted-foreground",
+          )}
+        >
+          <a.icon className="size-3.5" />
+          {!compact && a.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/* 备课：文件列表行 */
+function PrepCard({ item, onPreview }: { item: ResItem; onPreview: () => void }) {
+  const fk = fileKindStyle[item.fileKind ?? "Word"]
+  return (
+    <article className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition hover:border-brand/40 hover:shadow-sm">
+      {/* 文件类型图标 */}
+      <div className={cn("grid size-12 shrink-0 place-items-center rounded-lg text-white", fk.bg)}>
+        <fk.icon className="size-6" />
+      </div>
+
+      {/* 主体信息 */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h3 className="truncate text-[15px] font-semibold text-foreground">{item.title}</h3>
+          <SourceBadge level={item.level} showLabel />
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <User className="size-3.5 text-muted-foreground/70" />
+            {item.author}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Calendar className="size-3.5 text-muted-foreground/70" />
+            {item.uploadedAt}
+          </span>
+          <span>预览次数：<span className="font-medium text-foreground">{item.previewCount}</span></span>
+          <span>使用次数：<span className="font-medium text-foreground">{item.useCount}</span></span>
+          <span>共 <span className="font-medium text-foreground">{item.pages}</span> 页</span>
+        </div>
+      </div>
+
+      {/* 操作 */}
+      <div className="shrink-0">
+        <ResourceActions onPreview={onPreview} compact />
+      </div>
+    </article>
+  )
+}
+
+/* 微课：封面卡片 */
+function MicroCard({ item, onPreview }: { item: ResItem; onPreview: () => void }) {
+  return (
+    <article className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition hover:border-brand/40 hover:shadow-sm">
+      {/* 封面 */}
+      <button onClick={onPreview} className="relative aspect-video w-full overflow-hidden bg-muted">
+        {item.cover && (
+          <Image
+            src={item.cover || "/placeholder.svg"}
+            alt={item.title}
+            fill
+            className="object-cover transition group-hover:scale-105"
+            sizes="(max-width: 768px) 100vw, 33vw"
+          />
+        )}
+        {/* 播放遮罩 */}
+        <span className="absolute inset-0 grid place-items-center bg-foreground/0 transition group-hover:bg-foreground/20">
+          <span className="grid size-11 place-items-center rounded-full bg-card/90 text-brand opacity-0 shadow-lg transition group-hover:opacity-100">
+            <Play className="size-5 translate-x-0.5 fill-current" />
+          </span>
+        </span>
+        {/* 分类 + 级别 */}
+        <span className="absolute left-2 top-2 flex items-center gap-1.5">
+          {item.category && (
+            <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-medium", microCatStyle[item.category])}>
+              {item.category}
+            </span>
+          )}
+        </span>
+        <span className="absolute right-2 top-2">
+          <SourceBadge level={item.level} />
+        </span>
+        {/* 时长 */}
+        {item.duration && (
+          <span className="absolute bottom-2 right-2 rounded bg-foreground/75 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-background">
+            {item.duration}
+          </span>
+        )}
+      </button>
+
+      {/* 信息 */}
+      <div className="flex flex-1 flex-col p-2.5">
+        <h3 className="line-clamp-2 text-[13px] font-semibold leading-snug text-foreground">{item.title}</h3>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <User className="size-3 text-muted-foreground/70" />
+            {item.author}
+          </span>
+          <span>预览 {item.previewCount}</span>
+          <span>使用 {item.useCount}</span>
+        </div>
+        <div className="mt-2 border-t border-dashed border-border pt-2">
+          <ResourceActions onPreview={onPreview} compact />
+        </div>
+      </div>
+    </article>
+  )
+}
+
+/* 微课：列表行视图 */
+function MicroRow({ item, onPreview }: { item: ResItem; onPreview: () => void }) {
+  return (
+    <article className="flex items-center gap-4 rounded-xl border border-border bg-card p-3 transition hover:border-brand/40 hover:shadow-sm">
+      {/* 缩略图 */}
+      <button
+        onClick={onPreview}
+        className="group relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-muted"
+      >
+        {item.cover && (
+          <Image
+            src={item.cover || "/placeholder.svg"}
+            alt={item.title}
+            fill
+            className="object-cover transition group-hover:scale-105"
+            sizes="160px"
+          />
+        )}
+        <span className="absolute inset-0 grid place-items-center bg-foreground/0 transition group-hover:bg-foreground/20">
+          <span className="grid size-9 place-items-center rounded-full bg-card/90 text-brand opacity-0 shadow-lg transition group-hover:opacity-100">
+            <Play className="size-4 translate-x-0.5 fill-current" />
+          </span>
+        </span>
+        {item.duration && (
+          <span className="absolute bottom-1.5 right-1.5 rounded bg-foreground/75 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-background">
+            {item.duration}
+          </span>
+        )}
+      </button>
+
+      {/* 主体信息 */}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="truncate text-[15px] font-semibold text-foreground">{item.title}</h3>
+          {item.category && (
+            <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-medium", microCatStyle[item.category])}>
+              {item.category}
+            </span>
+          )}
+          <SourceBadge level={item.level} showLabel />
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <User className="size-3.5 text-muted-foreground/70" />
+            {item.author}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Calendar className="size-3.5 text-muted-foreground/70" />
+            {item.uploadedAt}
+          </span>
+          <span>预览次数：<span className="font-medium text-foreground">{item.previewCount}</span></span>
+          <span>使用次数：<span className="font-medium text-foreground">{item.useCount}</span></span>
+        </div>
+      </div>
+
+      {/* 操作 */}
+      <div className="shrink-0">
+        <ResourceActions onPreview={onPreview} compact />
+      </div>
+    </article>
   )
 }
 
@@ -699,10 +1115,14 @@ function ResourceCard({
 function PaperDetail({
   paper,
   premium,
+  selected,
+  onToggle,
   onBack,
 }: {
   paper: ResItem
   premium?: boolean
+  selected: string[]
+  onToggle: (id: string) => void
   onBack: () => void
 }) {
   const papered = (paper.qIds ?? []).map((id) => questions.find((q) => q.id === id)!).filter(Boolean)
@@ -775,48 +1195,13 @@ function PaperDetail({
               </h2>
               <div className="flex flex-col gap-3">
                 {g.items.map((q, i) => (
-                  <article key={q.id} className="rounded-xl border border-border bg-card p-4 sm:p-5">
-                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-                      <span className="font-semibold text-muted-foreground">{i + 1}</span>
-                      <SourceBadge level={q.level} />
-                      <span className={cn("rounded px-1.5 py-0.5 font-medium", diffStyle[q.difficulty])}>
-                        {q.difficulty}
-                      </span>
-                      <span className="inline-flex items-center gap-0.5 rounded bg-warn/20 px-1.5 py-0.5 font-medium text-warn-foreground">
-                        <PlayCircle className="size-3" />
-                        视频讲解
-                      </span>
-                    </div>
-                    <div className="text-[15px] leading-7 text-foreground">{q.stem}</div>
-                    {q.options && (
-                      <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-                        {q.options.map((o) => (
-                          <div key={o.key} className="flex items-baseline gap-2 text-sm text-foreground">
-                            <span className="font-medium text-muted-foreground">{o.key}.</span>
-                            <span>{o.content}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="my-3 border-t border-dashed border-border" />
-                    <div className="flex items-start gap-2 text-sm leading-7">
-                      <span className="shrink-0 font-medium text-brand">【答案】</span>
-                      <div>{q.answer}</div>
-                    </div>
-                    {/* 讲解视频 */}
-                    <div className="mt-3 flex items-center gap-3 rounded-lg bg-muted/60 p-2.5">
-                      <div className="grid size-9 shrink-0 place-items-center rounded-md bg-brand text-brand-foreground">
-                        <PlayCircle className="size-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-medium text-foreground">{q.videoTitle}</p>
-                        <p className="text-xs text-muted-foreground">讲解视频 · {q.videoDuration}</p>
-                      </div>
-                      <button className="rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-brand transition hover:bg-brand-soft">
-                        播放
-                      </button>
-                    </div>
-                  </article>
+                  <PaperQuestionCard
+                    key={q.id}
+                    q={q}
+                    index={i + 1}
+                    selected={selected.includes(q.id)}
+                    onToggle={() => onToggle(q.id)}
+                  />
                 ))}
               </div>
             </section>
@@ -827,6 +1212,84 @@ function PaperDetail({
   )
 }
 
+/* 试卷预览中的单题卡：题干可直接看，展开后与题库单题一致（基本信息 / 系统标注），并可加入题篮 */
+function PaperQuestionCard({
+  q,
+  index,
+  selected,
+  onToggle,
+}: {
+  q: Question
+  index: number
+  selected: boolean
+  onToggle: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<"info" | "tags">("info")
+
+  return (
+    <article
+      className={cn(
+        "rounded-xl border bg-card p-4 transition sm:p-5",
+        selected ? "border-brand ring-1 ring-brand/30" : "border-border",
+      )}
+    >
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-semibold text-muted-foreground">{index}</span>
+        <span className="rounded bg-brand-soft px-1.5 py-0.5 font-medium text-brand-soft-foreground">{q.qType}</span>
+        <SourceBadge level={q.level} />
+        <span className={cn("rounded px-1.5 py-0.5 font-medium", diffStyle[q.difficulty])}>{q.difficulty}</span>
+        <span className="inline-flex items-center gap-0.5 rounded bg-warn/20 px-1.5 py-0.5 font-medium text-warn-foreground">
+          <PlayCircle className="size-3" />
+          视频讲解
+        </span>
+      </div>
+
+      <div className="text-[15px] leading-7 text-foreground">{q.stem}</div>
+      {q.options && (
+        <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+          {q.options.map((o) => (
+            <div key={o.key} className="flex items-baseline gap-2 text-sm text-foreground">
+              <span className="font-medium text-muted-foreground">{o.key}.</span>
+              <span>{o.content}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="my-3 border-t border-dashed border-border" />
+
+      <div className="flex items-center justify-end gap-2">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-brand/40 hover:text-foreground"
+        >
+          <ChevronDown className={cn("size-3.5 transition", open && "rotate-180")} />
+          展开详情
+        </button>
+        <button
+          onClick={onToggle}
+          className={cn(
+            "inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition",
+            selected
+              ? "border border-border bg-card text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+              : "bg-brand text-brand-foreground hover:opacity-90",
+          )}
+        >
+          {selected ? <X className="size-3.5" strokeWidth={2.5} /> : <ShoppingCart className="size-3.5" />}
+          {selected ? "移出" : "加入"}
+        </button>
+      </div>
+
+      {open && (
+        <div className="mt-3">
+          <QuestionDetailPanel q={q} tab={tab} onTab={setTab} />
+        </div>
+      )}
+    </article>
+  )
+}
+
 /* ---------------------------- 主组件 ---------------------------- */
 
 export function ResourceWorkbench() {
@@ -834,6 +1297,8 @@ export function ResourceWorkbench() {
   const [qType, setQType] = useState<"全部" | QType>("全部")
   const [source, setSource] = useState<"全部" | Level>("全部")
   const [diff, setDiff] = useState<"全部" | Difficulty>("全部")
+  const [microCat, setMicroCat] = useState<"全部" | MicroCategory>("全部")
+  const [microView, setMicroView] = useState<"grid" | "list">("grid")
   const [compact, setCompact] = useState(false)
   const [moreFilters, setMoreFilters] = useState(false)
   const [selected, setSelected] = useState<string[]>(["q1"])
@@ -841,6 +1306,8 @@ export function ResourceWorkbench() {
   const [cartOpen, setCartOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [previewPaper, setPreviewPaper] = useState<ResItem | null>(null)
+  const [composing, setComposing] = useState(false)
+  const [uploadKind, setUploadKind] = useState<"备课" | "微课" | null>(null)
 
   const toggle = (id: string) =>
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
@@ -850,7 +1317,7 @@ export function ResourceWorkbench() {
       questions.filter((q) => {
         if (qType !== "全部" && q.qType !== qType) return false
         if (source !== "全部" && q.level !== source) return false
-        if (diff !== "全部" && q.difficulty !== diff) return false
+        if (diff !== "���部" && q.difficulty !== diff) return false
         return true
       }),
     [qType, source, diff],
@@ -866,8 +1333,65 @@ export function ResourceWorkbench() {
       : resourceType === "备课"
         ? lessonData
         : resourceType === "微课"
-          ? microData
+          ? microData.filter(
+              (m) =>
+                (source === "全部" || m.level === source) &&
+                (microCat === "全部" || m.category === microCat),
+            )
           : premiumData
+
+  /* 组卷 / 生成练习��全屏接管，隐藏应用左侧导航与顶栏 */
+  if (composing) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background">
+        <ExerciseComposer
+          items={cartItems}
+          onBack={() => setComposing(false)}
+          onRemove={(id) => toggle(id)}
+        />
+      </div>
+    )
+  }
+
+  /* 预览二级页：全屏接管，隐藏应用左侧导航与章节目录 */
+  if (previewPaper) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-background">
+        <PaperDetail
+          paper={previewPaper}
+          premium={isPremium}
+          selected={selected}
+          onToggle={toggle}
+          onBack={() => setPreviewPaper(null)}
+        />
+        {/* 预览页也保留题篮入口 */}
+        <button
+          onClick={() => setCartOpen(true)}
+          className="fixed bottom-8 right-6 z-30 flex flex-col items-center gap-0.5 rounded-2xl bg-brand px-3.5 py-3 text-brand-foreground shadow-lg shadow-brand/30 transition hover:opacity-95"
+        >
+          <ShoppingCart className="size-5" />
+          <span className="text-[11px] font-medium leading-none">题篮</span>
+          {selected.length > 0 && (
+            <span className="absolute -right-1.5 -top-1.5 grid min-w-5 place-items-center rounded-full border-2 border-background bg-hard px-1 text-[11px] font-bold text-white tabular-nums">
+              {selected.length}
+            </span>
+          )}
+        </button>
+        <CartDrawer
+          open={cartOpen}
+          items={cartItems}
+          onClose={() => setCartOpen(false)}
+          onRemove={(id) => toggle(id)}
+          onClear={() => setSelected([])}
+          onGenerate={() => {
+            setCartOpen(false)
+            setPreviewPaper(null)
+            setComposing(true)
+          }}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="relative flex h-full min-h-0">
@@ -883,14 +1407,6 @@ export function ResourceWorkbench() {
 
       {/* 主区域 */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {previewPaper ? (
-          <PaperDetail
-            paper={previewPaper}
-            premium={isPremium}
-            onBack={() => setPreviewPaper(null)}
-          />
-        ) : (
-          <>
         {/* 工具栏（无面包屑） */}
         <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-border bg-background/85 px-5 py-3 backdrop-blur">
           <button
@@ -937,13 +1453,33 @@ export function ResourceWorkbench() {
             />
           </div>
 
-          <Link
-            href="/new-question"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
-          >
-            <Plus className="size-4" />
-            新增题目
-          </Link>
+          {resourceType === "题目" && (
+            <Link
+              href="/new-question"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+            >
+              <Plus className="size-4" />
+              新增题目
+            </Link>
+          )}
+          {resourceType === "备课" && (
+            <button
+              onClick={() => setUploadKind("备课")}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+            >
+              <Upload className="size-4" />
+              上传文件
+            </button>
+          )}
+          {resourceType === "微课" && (
+            <button
+              onClick={() => setUploadKind("微课")}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+            >
+              <Upload className="size-4" />
+              上传微课
+            </button>
+          )}
         </div>
 
         {/* 精品资源：B 端可见性提示 */}
@@ -964,13 +1500,23 @@ export function ResourceWorkbench() {
               onChange={(v) => setSource(v as typeof source)}
               renderItem={(it) => (it === "全部" ? "全部" : `${it}级`.replace("我级", "我的"))}
             />
-            <button
-              onClick={() => setMoreFilters((v) => !v)}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition hover:text-foreground"
-            >
-              更多筛选
-              <ChevronDown className={cn("size-3.5 transition", moreFilters && "rotate-180")} />
-            </button>
+            {resourceType === "微课" && (
+              <FilterGroup
+                label="类型"
+                items={microCatFilters}
+                active={microCat}
+                onChange={(v) => setMicroCat(v as typeof microCat)}
+              />
+            )}
+            {resourceType !== "作业" && resourceType !== "微课" && (
+              <button
+                onClick={() => setMoreFilters((v) => !v)}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition hover:text-foreground"
+              >
+                更多筛选
+                <ChevronDown className={cn("size-3.5 transition", moreFilters && "rotate-180")} />
+              </button>
+            )}
 
             <div className="ml-auto flex items-center gap-3">
               <span className="text-xs text-muted-foreground">
@@ -1004,10 +1550,34 @@ export function ResourceWorkbench() {
                   </button>
                 </div>
               )}
+              {resourceType === "微课" && (
+                <div className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
+                  <button
+                    onClick={() => setMicroView("grid")}
+                    className={cn(
+                      "rounded-md p-1.5 transition",
+                      microView === "grid" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+                    )}
+                    aria-label="网格视图"
+                  >
+                    <LayoutGrid className="size-4" />
+                  </button>
+                  <button
+                    onClick={() => setMicroView("list")}
+                    className={cn(
+                      "rounded-md p-1.5 transition",
+                      microView === "list" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+                    )}
+                    aria-label="列表视图"
+                  >
+                    <Rows3 className="size-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {moreFilters && (
+          {moreFilters && resourceType !== "作业" && resourceType !== "微课" && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-2.5">
               {isQuestion && (
                 <FilterGroup
@@ -1047,28 +1617,51 @@ export function ResourceWorkbench() {
                 </div>
               )}
             </div>
+          ) : resourceType === "微课" ? (
+            microView === "grid" ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                {otherData.map((item) => (
+                  <MicroCard key={item.id} item={item} onPreview={() => {}} />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {otherData.map((item) => (
+                  <MicroRow key={item.id} item={item} onPreview={() => {}} />
+                ))}
+              </div>
+            )
           ) : (
             <div className="flex flex-col gap-3">
-              {otherData.map((item) => (
-                <ResourceCard
-                  key={item.id}
-                  item={item}
-                  premium={isPremium}
-                  canPreview={resourceType === "作业" || isPremium}
-                  onPreview={() => setPreviewPaper(item)}
-                />
-              ))}
+              {resourceType === "作业"
+                ? otherData.map((item) => (
+                    <HomeworkCard key={item.id} item={item} onPreview={() => setPreviewPaper(item)} />
+                  ))
+                : resourceType === "备课"
+                  ? otherData.map((item) => (
+                      <PrepCard key={item.id} item={item} onPreview={() => {}} />
+                    ))
+                  : otherData.map((item) => (
+                      <ResourceCard
+                        key={item.id}
+                        item={item}
+                        premium={isPremium}
+                        canPreview={isPremium}
+                        onPreview={() => setPreviewPaper(item)}
+                      />
+                    ))}
             </div>
           )}
         </div>
-          </>
-        )}
       </div>
 
-      {/* 右侧悬浮题篮球 */}
+      {/* 右侧悬浮题篮球（组卷时隐藏，避免与操作栏重叠） */}
       <button
         onClick={() => setCartOpen(true)}
-        className="fixed bottom-8 right-6 z-30 flex flex-col items-center gap-0.5 rounded-2xl bg-brand px-3.5 py-3 text-brand-foreground shadow-lg shadow-brand/30 transition hover:opacity-95"
+        className={cn(
+          "fixed bottom-8 right-6 z-30 flex flex-col items-center gap-0.5 rounded-2xl bg-brand px-3.5 py-3 text-brand-foreground shadow-lg shadow-brand/30 transition hover:opacity-95",
+          composing && "hidden",
+        )}
       >
         <ShoppingCart className="size-5" />
         <span className="text-[11px] font-medium leading-none">题篮</span>
@@ -1086,11 +1679,207 @@ export function ResourceWorkbench() {
         onClose={() => setCartOpen(false)}
         onRemove={(id) => toggle(id)}
         onClear={() => setSelected([])}
+        onGenerate={() => {
+          setCartOpen(false)
+          setPreviewPaper(null)
+          setComposing(true)
+        }}
       />
 
-      {/* 教材切换弹窗 */}
+      {/* 教���切换弹窗 */}
       <TextbookSwitcher open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
+
+      {/* 上传弹窗（备课文件 / 微课） */}
+      {uploadKind && <UploadModal kind={uploadKind} onClose={() => setUploadKind(null)} />}
     </div>
+  )
+}
+
+/* ---------------------------- 上传弹窗 ---------------------------- */
+
+const microCategories: MicroCategory[] = ["同步讲解", "专题突破", "复习巩固", "考点精析", "其他"]
+const levelOptions: Level[] = ["市", "区", "校", "我"]
+
+function UploadModal({ kind, onClose }: { kind: "备课" | "微课"; onClose: () => void }) {
+  const isMicro = kind === "微课"
+  const [fileName, setFileName] = useState("")
+  const [name, setName] = useState("")
+  const [desc, setDesc] = useState("")
+  const [cat, setCat] = useState<MicroCategory>("同步讲解")
+  const [level, setLevel] = useState<Level>("校")
+  const [coverName, setCoverName] = useState("")
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal>
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-card shadow-xl">
+        {/* 头 */}
+        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+          <h3 className="text-base font-bold text-foreground">{isMicro ? "上传微课" : "上传文件"}</h3>
+          <button
+            onClick={onClose}
+            aria-label="关闭"
+            className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* 表单 */}
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+          {/* 上传文件 */}
+          <Field label="上传文件" required>
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 px-4 py-6 text-center transition hover:border-brand/50 hover:bg-brand-soft/40">
+              <Upload className="size-6 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                {fileName ? (
+                  <span className="font-medium text-foreground">{fileName}</span>
+                ) : (
+                  <>
+                    点击选择或拖拽文件到此处
+                    <br />
+                    <span className="text-xs">
+                      {isMicro ? "支持 MP4 / MOV，单个不超过 500MB" : "支持 PPT / Word / PDF / Excel"}
+                    </span>
+                  </>
+                )}
+              </span>
+              <input
+                type="file"
+                className="hidden"
+                onChange={(e) => setFileName(e.target.files?.[0]?.name ?? "")}
+              />
+            </label>
+          </Field>
+
+          {isMicro && (
+            <>
+              {/* 微课名称 */}
+              <Field label="微课名称" required>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="请输入微课名称"
+                  className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-brand focus:ring-2 focus:ring-brand/20"
+                />
+              </Field>
+
+              {/* 封面 */}
+              <Field label="封面">
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-input bg-card px-3 py-2.5 transition hover:border-brand/50">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
+                    <Image_ />
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {coverName ? (
+                      <span className="font-medium text-foreground">{coverName}</span>
+                    ) : (
+                      "上传封面图（建议 16:9），不上传则自动截取视频首帧"
+                    )}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => setCoverName(e.target.files?.[0]?.name ?? "")}
+                  />
+                </label>
+              </Field>
+
+              {/* 微课分类 */}
+              <Field label="微课分类" required>
+                <div className="flex flex-wrap gap-2">
+                  {microCategories.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setCat(c)}
+                      className={cn(
+                        "rounded-lg border px-3 py-1.5 text-sm font-medium transition",
+                        cat === c
+                          ? "border-brand bg-brand-soft text-brand-soft-foreground"
+                          : "border-border text-muted-foreground hover:border-brand/40 hover:text-foreground",
+                      )}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
+              {/* 描述 */}
+              <Field label="描述">
+                <textarea
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                  rows={3}
+                  placeholder="简要描述微课内容、适用场景等"
+                  className="w-full resize-none rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-brand focus:ring-2 focus:ring-brand/20"
+                />
+              </Field>
+            </>
+          )}
+
+          {/* 级别 */}
+          <Field label="级别">
+            <div className="flex flex-wrap gap-2">
+              {levelOptions.map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLevel(l)}
+                  className={cn(
+                    "rounded-lg border px-3 py-1.5 text-sm font-medium transition",
+                    level === l
+                      ? "border-brand bg-brand-soft text-brand-soft-foreground"
+                      : "border-border text-muted-foreground hover:border-brand/40 hover:text-foreground",
+                  )}
+                >
+                  {l === "我" ? "我的" : `${l}级`}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+
+        {/* 底部 */}
+        <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-border px-5 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            取消
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-brand px-5 py-2 text-sm font-medium text-brand-foreground transition hover:opacity-90"
+          >
+            确认上传
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-foreground">
+        {label}
+        {required && <span className="ml-0.5 text-destructive">*</span>}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+/* 小图标：避免与 next/image 的 Image 命名冲突 */
+function Image_() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </svg>
   )
 }
 
@@ -1138,12 +1927,14 @@ function CartDrawer({
   onClose,
   onRemove,
   onClear,
+  onGenerate,
 }: {
   open: boolean
   items: Question[]
   onClose: () => void
   onRemove: (id: string) => void
   onClear: () => void
+  onGenerate: () => void
 }) {
   if (!open) return null
 
@@ -1245,11 +2036,12 @@ function CartDrawer({
             </button>
           )}
           <button
+            onClick={onGenerate}
             disabled={items.length === 0}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-sm font-medium text-brand-foreground transition hover:opacity-90 disabled:opacity-50"
           >
             <ClipboardList className="size-4" />
-            布置作业
+            生成练习
           </button>
         </div>
       </div>
